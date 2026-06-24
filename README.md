@@ -26,6 +26,7 @@ fonctionnalités au-dessus du code amont.
 
 | Domaine | Ajout |
 |---|---|
+| **Multi-source** | Ajouter **plusieurs sources** Xtream/M3U mixées dans les mêmes catalogues, avec **déduplication Films/Séries** et choix du flux à la lecture. |
 | **Catégories** | La webui charge les catégories du flux, les **étiquette par type** (TV / Films / Séries) et permet de **cocher** celles à garder (filtre, tout / aucun / inverser). |
 | **Catalogues** | 3 mises en page : un seul catalogue, un par catégorie, ou des **catalogues personnalisés** (groupes nommés de catégories). |
 | **Films & Séries (Xtream)** | Les catégories Films/Séries deviennent de **vrais catalogues Stremio** `movie` / `series` jouables (séries avec **saisons + épisodes**). |
@@ -90,6 +91,26 @@ séries restent à plat (un M3U ne porte pas d'arborescence saison/épisode).
 - Stockées dans **SQLite** (`data/`, persistant via le volume Docker), **chiffrées au repos** si
   `CONFIG_SECRET` est défini. Avec un mot de passe unique, ces configs sont **partagées** (pas de
   comptes séparés).
+
+### Multi-source (mixage + déduplication)
+
+Onglet **Multi-source** : ajoute plusieurs sources nommées (Xtream / M3U), charge et sélectionne les
+catégories **par source**, puis choisis la mise en page (combiné par type / un catalogue par
+catégorie) et le **comportement de lecture**.
+
+- **Mixage** : toutes les chaînes sélectionnées des sources sont fusionnées dans les catalogues.
+- **Déduplication Films/Séries** : les titres identiques (après normalisation : minuscules, sans
+  accents, sans tags `HD/4K/1080p/MULTI/VF…`) sont regroupés en **un seul élément** proposant
+  **un flux par source**. Les **chaînes TV** ne sont pas fusionnées (listées par source, suffixées
+  du nom de la source).
+- **Séries** : épisodes fusionnés par (saison, épisode) entre sources (Xtream).
+- **Lecture** (`streamSelection`, réglable dans la webui) :
+  - **Proposer le choix** → Stremio liste un flux par source (IPTV1 / IPTVPerso…) ;
+  - **Lire le 1er dispo** → seul le flux de la source prioritaire (ordre des sources).
+- **Limites** : pas d'EPG en multi-source pour l'instant ; côté M3U les séries restent à plat
+  (un M3U ne porte pas d'arborescence saison/épisode), seuls les films M3U sont dédupliqués.
+
+> Les configs mono-source restent inchangées et pleinement supportées.
 
 ---
 

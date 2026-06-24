@@ -7,6 +7,8 @@ import env from '../config/env';
 import * as xtreamProvider from '../providers/xtreamProvider';
 import * as iptvOrgProvider from '../providers/iptvOrgProvider';
 import * as m3uProvider from '../providers/m3uProvider';
+import * as multiSourceProvider from '../providers/multiSourceProvider';
+import { titleHash } from './dedup';
 
 const CACHE_ENABLED = env.CACHE_ENABLED;
 const CACHE_TTL_MS = env.CACHE_TTL_MS;
@@ -22,6 +24,7 @@ const PROVIDER_MAP: Record<string, { fetchData: (addon: any) => Promise<void> }>
     'xtream': xtreamProvider,
     'iptv-org': iptvOrgProvider,
     'm3u': m3uProvider,
+    'multi': multiSourceProvider,
 };
 
 export interface AddonConfig {
@@ -49,6 +52,30 @@ export interface AddonConfig {
     /** User-defined catalogs, each grouping one or more categories. */
     catalogGroups?: Array<{ name: string; categories: string[] }>;
     /** Category name → media type ('tv' | 'movie' | 'series'). Drives VOD/series. */
+    categoryTypes?: Record<string, 'tv' | 'movie' | 'series'>;
+    /** Multiple IPTV sources mixed into one set of catalogs. */
+    sources?: SourceConfig[];
+    /**
+     * Playback behaviour for de-duplicated items:
+     * 'choose' = expose one stream per source (Stremio lets the user pick),
+     * 'auto'   = only the first (highest-priority) source's stream.
+     */
+    streamSelection?: 'auto' | 'choose';
+}
+
+/** One IPTV source within a multi-source configuration. */
+export interface SourceConfig {
+    id: string;
+    name: string;
+    provider: 'xtream' | 'm3u';
+    xtreamUrl?: string;
+    xtreamUsername?: string;
+    xtreamPassword?: string;
+    m3uUrl?: string;
+    globalUserAgent?: string;
+    enableEpg?: boolean;
+    epgUrl?: string;
+    selectedCategories?: string[];
     categoryTypes?: Record<string, 'tv' | 'movie' | 'series'>;
 }
 
@@ -102,6 +129,28 @@ function normalizeSelection(config: AddonConfig) {
 }
 
 export function createCacheKey(config: AddonConfig) {
+    // Multi-source configs key on the (credential-identifying) source list +
+    // the merged catalog layout + playback mode.
+    if (config.sources && config.sources.length) {
+        const minimal = {
+            mode: 'multi',
+            streamSelection: config.streamSelection === 'auto' ? 'auto' : 'choose',
+            sources: config.sources.map(s => ({
+                provider: s.provider,
+                name: (s.name || '').trim(),
+                xtreamUrl: s.xtreamUrl || null,
+                xtreamUsername: s.xtreamUsername || null,
+                m3uUrl: s.m3uUrl || null,
+                enableEpg: !!s.enableEpg,
+                epgUrl: s.epgUrl || null,
+                selectedCategories: [...new Set((s.selectedCategories || [])
+                    .map(c => (typeof c === 'string' ? c.trim() : '')).filter(Boolean))].sort(),
+            })),
+            ...normalizeSelection(config),
+        };
+        return crypto.createHash('md5').update(stableStringify(minimal)).digest('hex');
+    }
+
     const provider = config.provider || 'xtream';
     let minimal: any;
     if (provider === 'iptv-org') {
@@ -165,7 +214,7 @@ export class M3UEPGAddon {
     log: ReturnType<typeof makeLogger>;
 
     constructor(config: AddonConfig = {}, manifestRef?: any) {
-        this.providerName = config.provider || 'xtream';
+        this.providerName = (config.sources && config.sources.length) ? 'multi' : (config.provider || 'xtream');
         this.config = config;
         this.manifestRef = manifestRef;
         this.cacheKey = createCacheKey(config);
@@ -335,12 +384,135 @@ export class M3UEPGAddon {
     itemsForCatalog(id: string): any[] {
         const spec = this.resolveCatalog(id);
         if (!spec) return [];
-        return this.channels.filter(c => {
+        const matched = this.channels.filter(c => {
             if (mediaTypeOf(c) !== spec.type) return false;
             if (!spec.cats) return true;
             const cat = channelCategory(c);
             return cat ? spec.cats.has(cat.trim()) : false;
         });
+        // De-duplicate by logical id (movies/series from several sources share
+        // one id). Single-source ids are unique so this is a no-op there.
+        const seen = new Set<string>();
+        const out: any[] = [];
+        for (const c of matched) {
+            if (seen.has(c.id)) continue;
+            seen.add(c.id);
+            out.push(c);
+        }
+        return out;
+    }
+
+    /** True when this addon aggregates multiple IPTV sources. */
+    isMulti(): boolean {
+        return !!(this.config.sources && this.config.sources.length);
+    }
+
+    private sourceById(id: string | undefined): SourceConfig | undefined {
+        if (!id) return undefined;
+        return (this.config.sources || []).find(s => s.id === id);
+    }
+
+    private streamHints(item: any) {
+        const h: Record<string, string> = {};
+        if (item?.userAgent) h['User-Agent'] = item.userAgent;
+        if (item?.referrer) h['Referer'] = item.referrer;
+        return Object.keys(h).length
+            ? { notWebReady: true, proxyHeaders: { request: h } }
+            : { notWebReady: true };
+    }
+
+    /** Parse a multi-source logical id. */
+    parseMultiId(id: string): { kind: 'tv' | 'movie' | 'series' | 'episode'; hash?: string; season?: number; episode?: number } | null {
+        const prefix = `xc${this.idPrefix}_`;
+        if (!id.startsWith(prefix)) return null;
+        const r = id.slice(prefix.length);
+        if (r.startsWith('mv_')) return { kind: 'movie', hash: r.slice(3) };
+        if (r.startsWith('sr_')) return { kind: 'series', hash: r.slice(3) };
+        if (r.startsWith('tvx_')) return { kind: 'tv' };
+        if (r.startsWith('ep_')) {
+            const m = r.slice(3).match(/^([a-f0-9]+)_(\d+)_(\d+)$/);
+            if (m) return { kind: 'episode', hash: m[1], season: +m[2], episode: +m[3] };
+        }
+        return null;
+    }
+
+    private async multiEpisodeStreams(hash: string, season: number, episode: number) {
+        await this.ensureDataLoaded();
+        const seriesId = `xc${this.idPrefix}_sr_${hash}`;
+        const seriesChans = this.channels.filter(c => c.id === seriesId);
+        const streams: any[] = [];
+        for (const sc of seriesChans) {
+            const src = this.sourceById(sc.source?.id);
+            if (!src || src.provider !== 'xtream') continue;
+            try {
+                const { episodes } = await xtreamProvider.fetchSeriesEpisodes(src, sc.srcSeriesId);
+                const ep = episodes.find((e: any) => e.season === season && e.episode === episode);
+                if (ep) {
+                    streams.push({
+                        url: `${src.xtreamUrl}/series/${src.xtreamUsername}/${src.xtreamPassword}/${ep.id}.${ep.ext}`,
+                        title: sc.source?.name || 'Source',
+                        behaviorHints: { notWebReady: true },
+                    });
+                }
+            } catch { /* skip failing source */ }
+        }
+        return this.config.streamSelection === 'auto' ? streams.slice(0, 1) : streams;
+    }
+
+    private async multiSeriesMeta(id: string, hash: string) {
+        await this.ensureDataLoaded();
+        const seriesChans = this.channels.filter(c => c.id === id);
+        const first = seriesChans[0];
+        const logoUrl = first ? this.deriveFallbackLogoUrl(first) : undefined;
+        const merged = new Map<string, any>();
+        for (const sc of seriesChans) {
+            const src = this.sourceById(sc.source?.id);
+            if (!src || src.provider !== 'xtream') continue;
+            try {
+                const { episodes } = await xtreamProvider.fetchSeriesEpisodes(src, sc.srcSeriesId);
+                for (const ep of episodes) {
+                    const k = `${ep.season}_${ep.episode}`;
+                    if (!merged.has(k)) merged.set(k, ep);
+                }
+            } catch { /* skip */ }
+        }
+        const videos = [...merged.values()]
+            .sort((a, b) => a.season - b.season || a.episode - b.episode)
+            .map(ep => ({
+                id: `xc${this.idPrefix}_ep_${hash}_${ep.season}_${ep.episode}`,
+                title: ep.title,
+                season: ep.season,
+                episode: ep.episode,
+                ...(ep.thumbnail ? { thumbnail: ep.thumbnail } : (logoUrl ? { thumbnail: logoUrl } : {})),
+                ...(ep.overview ? { overview: ep.overview } : {}),
+                ...(ep.released ? { released: ep.released } : {}),
+            }));
+        return {
+            id,
+            type: 'series',
+            name: first?.name || 'Series',
+            ...(logoUrl ? { poster: logoUrl, logo: logoUrl, background: logoUrl } : {}),
+            posterShape: 'poster',
+            description: first?.plot || '',
+            ...(first?.category ? { genres: [first.category] } : {}),
+            videos,
+        };
+    }
+
+    private simpleMeta(item: any, type: 'tv' | 'movie') {
+        const logoUrl = this.deriveFallbackLogoUrl(item);
+        return {
+            id: item.id,
+            type,
+            name: item.name,
+            poster: logoUrl,
+            logo: logoUrl,
+            background: logoUrl,
+            posterShape: type === 'tv' ? 'square' : 'poster',
+            description: item.plot || (type === 'tv' ? '📡 Live Channel' : ''),
+            ...(item.category ? { genres: [item.category] } : {}),
+            ...(type === 'tv' ? { runtime: 'Live' } : {}),
+        };
     }
 
     /** Parse one of our ids into its kind and payload. */
@@ -538,6 +710,23 @@ export class M3UEPGAddon {
     }
 
     async getStreams(id: string) {
+        // Multi-source: streams come from every source that has the item.
+        if (this.isMulti()) {
+            const p = this.parseMultiId(id);
+            if (p?.kind === 'episode') return this.multiEpisodeStreams(p.hash!, p.season!, p.episode!);
+            await this.ensureDataLoaded();
+            if (p?.kind === 'movie') {
+                let matches = this.channels.filter(c => c.id === id);
+                if (this.config.streamSelection === 'auto') matches = matches.slice(0, 1);
+                return matches.map(c => ({ url: c.url, title: c.source?.name || c.name, behaviorHints: this.streamHints(c) }));
+            }
+            if (p?.kind === 'tv') {
+                const item = this.channelMap.get(id);
+                return item ? [{ url: item.url, title: item.source?.name || item.name, behaviorHints: this.streamHints(item) }] : [];
+            }
+            return [];
+        }
+
         // Series episodes are not stored as channels — resolve them directly.
         const parsed = this.parseId(id);
         if (parsed?.kind === 'episode') {
@@ -627,6 +816,16 @@ export class M3UEPGAddon {
     }
 
     async getDetailedMeta(id: string) {
+        // Multi-source meta.
+        if (this.isMulti()) {
+            const p = this.parseMultiId(id);
+            if (p?.kind === 'series') return this.multiSeriesMeta(id, p.hash!);
+            await this.ensureDataLoaded();
+            const item = this.channelMap.get(id) || this.channels.find(c => c.id === id);
+            if (!item) return null;
+            return this.simpleMeta(item, mediaTypeOf(item) === 'movie' ? 'movie' : 'tv');
+        }
+
         const parsed = this.parseId(id);
         if (parsed?.kind === 'series') {
             await this.ensureDataLoaded();

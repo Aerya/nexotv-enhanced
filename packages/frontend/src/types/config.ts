@@ -1,11 +1,35 @@
-export type Provider = 'xtream' | 'iptv-org' | 'm3u';
+export type Provider = 'xtream' | 'iptv-org' | 'm3u' | 'multi';
 
 export type CatalogMode = 'single' | 'split' | 'custom';
 export type CategoryType = 'tv' | 'movie' | 'series';
+export type StreamSelection = 'auto' | 'choose';
 
 export interface CatalogGroup {
   name: string;
   categories: string[];
+}
+
+export interface SourceConfig {
+  id: string;
+  name: string;
+  provider: 'xtream' | 'm3u';
+  xtreamUrl?: string;
+  xtreamUsername?: string;
+  xtreamPassword?: string;
+  m3uUrl?: string;
+  globalUserAgent?: string;
+  selectedCategories?: string[];
+  categoryTypes?: Record<string, CategoryType>;
+}
+
+export interface MultiConfig {
+  provider?: 'multi';
+  sources: SourceConfig[];
+  catalogMode?: CatalogMode;
+  selectedCategories?: string[];
+  categoryTypes?: Record<string, CategoryType>;
+  streamSelection?: StreamSelection;
+  reformatLogos?: boolean;
 }
 
 export interface XtreamConfig {
@@ -52,7 +76,7 @@ export interface M3uConfig {
   categoryTypes?: Record<string, CategoryType>;
 }
 
-export type AddonConfig = (XtreamConfig | IptvOrgConfig | M3uConfig) & { catalogName?: string };
+export type AddonConfig = (XtreamConfig | IptvOrgConfig | M3uConfig | MultiConfig) & { catalogName?: string };
 
 export interface AddonInfo {
   name: string;

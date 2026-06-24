@@ -203,6 +203,56 @@ describe('resolveCatalog & itemsForCatalog', () => {
   });
 });
 
+// ─── multi-source ────────────────────────────────────────────────────────────
+
+describe('multi-source', () => {
+  function multiAddon() {
+    const a = new M3UEPGAddon({
+      sources: [{ id: 's1', name: 'A', provider: 'xtream' }, { id: 's2', name: 'B', provider: 'xtream' }],
+      catalogMode: 'single',
+      selectedCategories: ['Films'],
+      categoryTypes: { Films: 'movie' },
+    } as any);
+    a.idPrefix = 'pfx';
+    a.channels = [
+      { id: 'xcpfx_mv_aaa', name: 'X', mediaType: 'movie', category: 'Films', source: { id: 's1', name: 'A' }, url: 'u1' },
+      { id: 'xcpfx_mv_aaa', name: 'X', mediaType: 'movie', category: 'Films', source: { id: 's2', name: 'B' }, url: 'u2' },
+    ];
+    return a;
+  }
+
+  it('isMulti reflects the sources list', () => {
+    expect(multiAddon().isMulti()).toBe(true);
+    expect(new M3UEPGAddon({ provider: 'xtream' }).isMulti()).toBe(false);
+  });
+
+  it('parseMultiId decodes movie/series/tv/episode ids', () => {
+    const a = multiAddon();
+    expect(a.parseMultiId('xcpfx_mv_aaa')).toEqual({ kind: 'movie', hash: 'aaa' });
+    expect(a.parseMultiId('xcpfx_sr_bbb')).toEqual({ kind: 'series', hash: 'bbb' });
+    expect(a.parseMultiId('xcpfx_tvx_s1_deadbeef')).toEqual({ kind: 'tv' });
+    expect(a.parseMultiId('xcpfx_ep_abc123_2_5')).toEqual({ kind: 'episode', hash: 'abc123', season: 2, episode: 5 });
+  });
+
+  it('itemsForCatalog de-duplicates movies sharing a logical id', () => {
+    const items = multiAddon().itemsForCatalog('iptv_movies');
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe('xcpfx_mv_aaa');
+  });
+
+  it('getStreams returns one stream per source (choose) or only the first (auto)', async () => {
+    const choose = multiAddon();
+    const all = await choose.getStreams('xcpfx_mv_aaa');
+    expect(all.map((s: any) => s.title)).toEqual(['A', 'B']);
+
+    const auto = multiAddon();
+    auto.config.streamSelection = 'auto';
+    const one = await auto.getStreams('xcpfx_mv_aaa');
+    expect(one).toHaveLength(1);
+    expect(one[0].url).toBe('u1');
+  });
+});
+
 // ─── generateMetaPreview (typed) ─────────────────────────────────────────────
 
 describe('generateMetaPreview typed', () => {
