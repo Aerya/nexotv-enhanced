@@ -64,21 +64,20 @@
 
     <button type="button" class="btn ghost add-src" @click="addSource">+ Ajouter une source</button>
 
+    <fieldset v-if="mergedCategories.length">
+      <legend>Catalogues</legend>
+      <p class="hint">Construits à partir des catégories <strong>fusionnées</strong> de toutes les sources.</p>
+      <CategorySelector
+        v-model="globalSelected"
+        v-model:mode="catalogMode"
+        v-model:groups="catalogGroups"
+        :categories="mergedCategories"
+        modeName="multiCatalogMode"
+      />
+    </fieldset>
+
     <fieldset>
-      <legend>Catalogues & lecture</legend>
-      <div class="form-group">
-        <label class="group-label">Mise en page</label>
-        <div class="radio-group">
-          <label class="checkbox-line">
-            <input type="radio" name="multiLayout" value="single" v-model="catalogMode">
-            <span class="checkbox-label"><strong>Combiné par type</strong> — un catalogue TV, un Films, un Séries.</span>
-          </label>
-          <label class="checkbox-line">
-            <input type="radio" name="multiLayout" value="split" v-model="catalogMode">
-            <span class="checkbox-label"><strong>Un catalogue par catégorie</strong>.</span>
-          </label>
-        </div>
-      </div>
+      <legend>Lecture</legend>
       <div class="form-group">
         <label class="group-label">Lecture d'un contenu</label>
         <div class="radio-group">
@@ -106,11 +105,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, inject, onMounted } from 'vue'
+import { ref, reactive, computed, watch, inject, onMounted } from 'vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
-import type { CategoryType, CatalogMode, StreamSelection, MultiConfig, SourceConfig } from '../types/config'
+import CategorySelector from './CategorySelector.vue'
+import type { CategoryType, CatalogMode, StreamSelection, MultiConfig, SourceConfig, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
 
@@ -136,6 +136,35 @@ const sources = reactive<SourceState[]>([blankSource()])
 const catalogMode = ref<CatalogMode>('single')
 const streamSelection = ref<StreamSelection>('choose')
 const catalogName = ref('')
+const globalSelected = ref<string[]>([])
+const catalogGroups = ref<CatalogGroup[]>([])
+
+// Merged category pool = union of every source's selected categories.
+// Type priority on conflicts: movie/series win over tv.
+const mergedCategories = computed<Entry[]>(() => {
+  const byName = new Map<string, Entry>()
+  for (const s of sources) {
+    const typeByName = new Map(s.categories.map(c => [c.name, c.type || 'tv']))
+    for (const name of s.selected) {
+      const t = (typeByName.get(name) as CategoryType) || 'tv'
+      const cur = byName.get(name)
+      if (!cur) byName.set(name, { name, type: t })
+      else if (cur.type === 'tv' && t !== 'tv') cur.type = t
+    }
+  }
+  const order: Record<CategoryType, number> = { tv: 0, movie: 1, series: 2 }
+  return [...byName.values()].sort((a, b) => order[a.type!] - order[b.type!] || a.name.localeCompare(b.name))
+})
+
+// Keep globalSelected in sync with the pool: add newly-selected categories,
+// drop removed ones, preserve the user's manual deselections.
+let knownMerged = new Set<string>()
+watch(mergedCategories, (entries) => {
+  const names = new Set(entries.map(e => e.name))
+  globalSelected.value = globalSelected.value.filter(n => names.has(n))
+  for (const e of entries) if (!knownMerged.has(e.name)) globalSelected.value.push(e.name)
+  knownMerged = names
+}, { deep: false })
 
 function addSource() { sources.push(blankSource()) }
 function removeSource(i: number) { sources.splice(i, 1) }
@@ -263,7 +292,10 @@ function buildConfig(): (MultiConfig & { catalogName?: string }) | null {
     out.push(src)
   }
   if (!out.length) return null
-  return {
+
+  // Top-level catalog layout operates on the merged category pool.
+  const poolNames = new Set(mergedCategories.value.map(e => e.name))
+  const cfg: MultiConfig & { catalogName?: string } = {
     sources: out,
     catalogMode: catalogMode.value,
     selectedCategories: [...mergedSel],
@@ -272,6 +304,18 @@ function buildConfig(): (MultiConfig & { catalogName?: string }) | null {
     reformatLogos: true,
     ...(catalogName.value.trim() ? { catalogName: catalogName.value.trim() } : {}),
   }
+
+  if (catalogMode.value === 'custom') {
+    const groups = catalogGroups.value
+      .map(g => ({ name: g.name.trim(), categories: g.categories.filter(c => poolNames.has(c)) }))
+      .filter(g => g.name && g.categories.length > 0)
+    cfg.catalogGroups = groups
+  } else {
+    // single / split: restrict to the user's global selection within the pool.
+    const sel = globalSelected.value.filter(c => poolNames.has(c))
+    cfg.selectedCategories = sel.length ? sel : [...mergedSel]
+  }
+  return cfg
 }
 
 async function handleInstall() {
@@ -315,7 +359,11 @@ onMounted(() => {
     }
     sources.push(st)
   }
-  catalogMode.value = d.catalogMode === 'split' ? 'split' : 'single'
+  catalogMode.value = d.catalogMode === 'split' ? 'split'
+    : d.catalogMode === 'custom' ? 'custom' : 'single'
+  if (Array.isArray(d.catalogGroups)) {
+    catalogGroups.value = d.catalogGroups.map((g: any) => ({ name: g.name, categories: [...(g.categories || [])] }))
+  }
   streamSelection.value = d.streamSelection === 'auto' ? 'auto' : 'choose'
   catalogName.value = d.catalogName || ''
 })
