@@ -179,6 +179,7 @@ import { reactive, ref, inject, onMounted } from 'vue'
 import { usePublicPlaylists } from '../composables/usePublicPlaylists'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
+import { useAuth } from '../composables/useAuth'
 import type { M3uConfig, CatalogMode, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
@@ -236,6 +237,7 @@ async function fetchPlaylistText(url: string): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url, purpose: 'm3u_categories' })
   })
+  if (res.status === 401) { useAuth().markUnauthenticated(); throw new Error('Session expired — please sign in again.') }
   let payload: any = {}
   try { payload = await res.json() } catch {}
   if (!res.ok || !payload.ok || !payload.content) {

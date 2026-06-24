@@ -120,6 +120,7 @@ import { reactive, ref, inject, onMounted } from 'vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAddonInfo } from '../composables/useAddonInfo'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
+import { useAuth } from '../composables/useAuth'
 import type { XtreamConfig, CatalogMode, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
@@ -364,6 +365,7 @@ async function fetchTextServer(url: string, purpose: string): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url, purpose })
   })
+  if (res.status === 401) { useAuth().markUnauthenticated(); throw new Error('Session expired — please sign in again.') }
   let payload: any = {}
   try { payload = await res.json() } catch {}
   if (!res.ok) {

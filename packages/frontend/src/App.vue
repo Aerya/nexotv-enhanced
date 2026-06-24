@@ -2,6 +2,14 @@
   <div class="app-container">
     <TheHeader />
 
+    <!-- Password gate: shown when the server requires auth and we're not in. -->
+    <LoginGate v-if="auth.state.ready && auth.state.enabled && !auth.state.authenticated" />
+
+    <template v-else-if="auth.state.ready">
+    <div v-if="auth.state.enabled" class="logout-bar">
+      <button class="btn tiny ghost" @click="auth.logout()">Log out</button>
+    </div>
+
     <main class="main-content">
       <section class="config-section">
         <div class="card configurator-card">
@@ -82,6 +90,7 @@
       :isReady="poll.isReady.value"
       @close="poll.hideOverlay()"
     />
+    </template>
   </div>
 </template>
 
@@ -89,16 +98,19 @@
 import { ref, provide, onMounted } from 'vue'
 import TheHeader from './components/TheHeader.vue'
 import TheOverlay from './components/TheOverlay.vue'
+import LoginGate from './components/LoginGate.vue'
 import XtreamConfig from './components/XtreamConfig.vue'
 import IptvOrgConfig from './components/IptvOrgConfig.vue'
 import M3uConfig from './components/M3uConfig.vue'
 import { useManifestPoll } from './composables/useManifestPoll'
 import { useConfigToken } from './composables/useConfigToken'
 import { useDecodedToken } from './composables/useDecodedToken'
+import { useAuth } from './composables/useAuth'
 import type { Provider } from './types/config'
 
 const poll = useManifestPoll()
 const { buildUrls } = useConfigToken(poll.appendDetail)
+const auth = useAuth()
 
 // Provide overlay control to all child components
 provide('overlayControl', {
@@ -114,6 +126,9 @@ provide('overlayControl', {
 // Active tab state — default to iptv-org
 const activeTab = ref<Provider>('iptv-org')
 
+// Check auth status on load (shows the login gate if required).
+onMounted(() => { auth.recheck() })
+
 // Reconfiguration: switch to the correct tab based on the decoded token
 onMounted(() => {
   const { decodedConfig } = useDecodedToken()
@@ -122,3 +137,13 @@ onMounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.logout-bar {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 960px;
+  margin: 0.5rem auto -0.5rem;
+  padding: 0 1rem;
+}
+</style>
