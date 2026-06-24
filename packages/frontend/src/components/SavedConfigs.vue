@@ -1,8 +1,9 @@
 <template>
   <div class="card saved-card" v-if="saved.state.items.length || saved.state.loaded">
-    <h2>Saved configurations</h2>
+    <h2>{{ t('Saved configurations', 'Configurations sauvegardées') }}</h2>
     <p v-if="!saved.state.items.length" class="hint">
-      No saved configuration yet. Build one below and click <strong>Save</strong>.
+      {{ t('No saved configuration yet. Build one below and click', 'Aucune configuration sauvegardée. Crées-en une ci-dessous puis clique sur') }}
+      <strong>{{ t('Save', 'Sauvegarder') }}</strong>.
     </p>
     <ul v-else class="saved-list">
       <li v-for="item in saved.state.items" :key="item.id" class="saved-item">
@@ -10,9 +11,9 @@
         <span class="saved-name" :title="item.name">{{ item.name }}</span>
         <span class="saved-date">{{ formatDate(item.updatedAt) }}</span>
         <button type="button" class="btn tiny" :disabled="busy === item.id" @click="load(item)">
-          {{ busy === item.id ? 'Loading…' : 'Load' }}
+          {{ busy === item.id ? t('Loading…', 'Chargement…') : t('Load', 'Charger') }}
         </button>
-        <button type="button" class="btn tiny ghost danger" @click="remove(item)">Delete</button>
+        <button type="button" class="btn tiny ghost danger" @click="remove(item)">{{ t('Delete', 'Supprimer') }}</button>
       </li>
     </ul>
     <p v-if="error" class="hint warn">{{ error }}</p>
@@ -22,9 +23,11 @@
 <script setup lang="ts">
 import { ref, inject, onMounted } from 'vue'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
+import { useI18n } from '../composables/useI18n'
 
 const oc = inject<any>('overlayControl')!
 const saved = useSavedConfigs()
+const { t } = useI18n()
 const busy = ref('')
 const error = ref('')
 
@@ -53,7 +56,7 @@ async function load(item: { id: string }) {
 }
 
 async function remove(item: { id: string; name: string }) {
-  if (!confirm(`Delete saved configuration “${item.name}”?`)) return
+  if (!confirm(t(`Delete saved configuration “${item.name}”?`, `Supprimer la configuration « ${item.name} » ?`))) return
   error.value = ''
   try { await saved.remove(item.id) } catch (e: any) { error.value = e.message || 'Delete failed' }
 }

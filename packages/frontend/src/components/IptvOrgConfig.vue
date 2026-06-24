@@ -1,7 +1,7 @@
 <template>
   <form class="config-form" autocomplete="off" @submit.prevent="handleSubmit">
     <fieldset>
-      <legend>Channel Filter</legend>
+      <legend>{{ t('Channel Filter', 'Filtre des chaînes') }}</legend>
 
       <div class="info-banner">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -16,7 +16,7 @@
       </div>
 
       <div class="form-group">
-        <label>Country</label>
+        <label>{{ t('Country', 'Pays') }}</label>
         <div class="searchable-select" ref="countrySelectEl">
           <div class="selected-tags">
             <span v-for="item in selectedCountries" :key="item.value" class="tag">
@@ -37,11 +37,11 @@
             </li>
           </ul>
         </div>
-        <small class="hint">Leave blank to include all countries.</small>
+        <small class="hint">{{ t('Leave blank to include all countries.', 'Laisser vide pour inclure tous les pays.') }}</small>
       </div>
 
       <div class="form-group">
-        <label>Category</label>
+        <label>{{ t('Category', 'Catégorie') }}</label>
         <div class="searchable-select" ref="categorySelectEl">
           <div class="selected-tags">
             <span v-for="item in selectedCategories" :key="item.value" class="tag">
@@ -62,14 +62,14 @@
             </li>
           </ul>
         </div>
-        <small class="hint">Leave blank to include all categories.</small>
+        <small class="hint">{{ t('Leave blank to include all categories.', 'Laisser vide pour inclure toutes les catégories.') }}</small>
       </div>
     </fieldset>
 
     <fieldset>
-      <legend>Display</legend>
+      <legend>{{ t('Display', 'Affichage') }}</legend>
       <div class="form-group">
-        <label for="iptvCatalogName">Catalog Name</label>
+        <label for="iptvCatalogName">{{ t('Catalog Name', 'Nom du catalogue') }}</label>
         <input type="text" id="iptvCatalogName" v-model="catalogName"
           placeholder="NexoTV-Enhanced">
         <small class="hint">Name shown in Stremio's channel list. Leave blank to use the default.</small>
@@ -77,9 +77,9 @@
     </fieldset>
 
     <div class="form-actions">
-      <button type="button" class="btn ghost" @click="handleSave">Save configuration</button>
+      <button type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
       <button type="submit" class="btn primary" id="iptv-org-submit">
-        Install Addon
+        {{ t('Install Addon', 'Installer l\'addon') }}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 12h14M12 5l7 7-7 7"/>
@@ -93,9 +93,11 @@
 import { ref, computed, onMounted, inject } from 'vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
+import { useI18n } from '../composables/useI18n'
 import type { IptvOrgConfig } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
+const { t } = useI18n()
 const catalogName = ref('')
 
 const IPTV_ORG_BASE = 'https://iptv-org.github.io/api'

@@ -1,11 +1,11 @@
 <template>
   <div class="login-wrap">
     <form class="card login-card" @submit.prevent="submit">
-      <h2>Sign in</h2>
-      <p class="hint">This NexoTV-Enhanced instance is password protected.</p>
+      <h2>{{ t('Sign in', 'Connexion') }}</h2>
+      <p class="hint">{{ t('This NexoTV-Enhanced instance is password protected.', 'Cette instance NexoTV-Enhanced est protégée par mot de passe.') }}</p>
 
       <div class="form-group password-group">
-        <label for="webuiPassword">Password</label>
+        <label for="webuiPassword">{{ t('Password', 'Mot de passe') }}</label>
         <div class="pwd-wrapper">
           <input
             :type="show ? 'text' : 'password'"
@@ -15,7 +15,7 @@
             :disabled="loading"
             autofocus
           >
-          <button type="button" class="btn tiny ghost" @click="show = !show">{{ show ? 'Hide' : 'Show' }}</button>
+          <button type="button" class="btn tiny ghost" @click="show = !show">{{ show ? t('Hide', 'Cacher') : t('Show', 'Afficher') }}</button>
         </div>
       </div>
 
@@ -23,7 +23,7 @@
 
       <div class="form-actions">
         <button class="btn primary" type="submit" :disabled="loading || !password">
-          {{ loading ? 'Signing in…' : 'Sign in' }}
+          {{ loading ? t('Signing in…', 'Connexion…') : t('Sign in', 'Se connecter') }}
         </button>
       </div>
     </form>
@@ -33,8 +33,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAuth } from '../composables/useAuth'
+import { useI18n } from '../composables/useI18n'
 
 const { login } = useAuth()
+const { t } = useI18n()
 const password = ref('')
 const show = ref(false)
 const loading = ref(false)

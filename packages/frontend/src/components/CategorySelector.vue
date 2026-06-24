@@ -2,30 +2,27 @@
   <div class="category-selector">
     <!-- Catalog layout chooser -->
     <div class="form-group">
-      <label class="group-label">Catalog layout</label>
+      <label class="group-label">{{ t('Catalog layout', 'Mise en page des catalogues') }}</label>
       <div class="radio-group">
         <label class="checkbox-line">
           <input type="radio" :name="modeName" value="single"
             :checked="mode === 'single'" @change="$emit('update:mode', 'single')">
           <span class="checkbox-label">
-            <strong>Single catalog</strong> — all selected categories grouped into one catalog
-            (categories stay available as a genre filter inside it).
+            <strong>{{ t('Single catalog', 'Catalogue unique') }}</strong> — {{ t('all selected categories grouped into one catalog (categories stay available as a genre filter inside it).', 'toutes les catégories regroupées dans un seul catalogue (les catégories restent un filtre de genre interne).') }}
           </span>
         </label>
         <label class="checkbox-line">
           <input type="radio" :name="modeName" value="split"
             :checked="mode === 'split'" @change="$emit('update:mode', 'split')">
           <span class="checkbox-label">
-            <strong>One catalog per category</strong> — each selected category becomes its own
-            Stremio catalog row.
+            <strong>{{ t('One catalog per category', 'Un catalogue par catégorie') }}</strong> — {{ t('each selected category becomes its own Stremio catalog row.', 'chaque catégorie devient sa propre ligne de catalogue dans Stremio.') }}
           </span>
         </label>
         <label class="checkbox-line">
           <input type="radio" :name="modeName" value="custom"
             :checked="mode === 'custom'" @change="$emit('update:mode', 'custom')">
           <span class="checkbox-label">
-            <strong>Custom catalogs</strong> — build your own catalogs, each grouping one or more
-            categories.
+            <strong>{{ t('Custom catalogs', 'Catalogues personnalisés') }}</strong> — {{ t('build your own catalogs, each grouping one or more categories.', 'composez vos propres catalogues, chacun regroupant une ou plusieurs catégories.') }}
           </span>
         </label>
       </div>
@@ -40,21 +37,20 @@
       </button>
     </div>
     <small v-if="hasTypes" class="hint">
-      Type is auto-detected. Movie and Series catalogs play directly from your provider
-      (series show seasons &amp; episodes on Xtream).
+      {{ t('Type is auto-detected. Movie and Series catalogs play directly from your provider (series show seasons & episodes on Xtream).', 'Type auto-détecté. Les catalogues Films et Séries se lisent directement depuis votre fournisseur (séries avec saisons & épisodes en Xtream).') }}
     </small>
 
     <!-- single / split: simple category picker -->
     <template v-if="mode !== 'custom'">
       <div class="cat-toolbar">
-        <input type="text" class="cat-filter" v-model="filter" placeholder="Filter categories…" autocomplete="off">
-        <span class="cat-count">{{ selectedSet.size }} / {{ categories.length }} selected</span>
+        <input type="text" class="cat-filter" v-model="filter" :placeholder="t('Filter categories…', 'Filtrer les catégories…')" autocomplete="off">
+        <span class="cat-count">{{ selectedSet.size }} / {{ categories.length }} {{ t('selected', 'sélectionnées') }}</span>
       </div>
 
       <div class="cat-actions">
-        <button type="button" class="btn tiny ghost" @click="selectAll">Select all</button>
-        <button type="button" class="btn tiny ghost" @click="selectNone">Select none</button>
-        <button type="button" class="btn tiny ghost" @click="invert">Invert</button>
+        <button type="button" class="btn tiny ghost" @click="selectAll">{{ t('Select all', 'Tout') }}</button>
+        <button type="button" class="btn tiny ghost" @click="selectNone">{{ t('Select none', 'Aucun') }}</button>
+        <button type="button" class="btn tiny ghost" @click="invert">{{ t('Invert', 'Inverser') }}</button>
       </div>
 
       <div class="cat-list">
@@ -65,11 +61,11 @@
           <span class="cat-name" :title="cat.name">{{ cat.name }}</span>
           <span v-if="cat.count != null" class="cat-badge">{{ cat.count }}</span>
         </label>
-        <p v-if="filtered.length === 0" class="cat-empty">No category matches the current filter.</p>
+        <p v-if="filtered.length === 0" class="cat-empty">{{ t('No category matches the current filter.', 'Aucune catégorie ne correspond au filtre.') }}</p>
       </div>
 
       <small v-if="mode === 'split' && selectedSet.size > splitWarnThreshold" class="hint warn">
-        {{ selectedSet.size }} categories selected — that's a lot of catalog rows in Stremio.
+        {{ t(`${selectedSet.size} categories selected — that's a lot of catalog rows in Stremio.`, `${selectedSet.size} catégories sélectionnées — ça fait beaucoup de lignes de catalogue dans Stremio.`) }}
       </small>
     </template>
 
@@ -79,12 +75,12 @@
         <div v-for="(group, gi) in groups" :key="gi" class="group-card">
           <div class="group-head">
             <input type="text" class="group-name" :value="group.name"
-              placeholder="Catalog name" @input="setGroupName(gi, ($event.target as HTMLInputElement).value)">
+              :placeholder="t('Catalog name', 'Nom du catalogue')" @input="setGroupName(gi, ($event.target as HTMLInputElement).value)">
             <span class="cat-badge">{{ group.categories.length }} cat.</span>
             <button type="button" class="btn tiny ghost" @click="toggleExpanded(gi)">
-              {{ expanded.has(gi) ? 'Hide' : 'Pick categories' }}
+              {{ expanded.has(gi) ? t('Hide', 'Masquer') : t('Pick categories', 'Choisir les catégories') }}
             </button>
-            <button type="button" class="btn tiny ghost danger" @click="removeGroup(gi)">Remove</button>
+            <button type="button" class="btn tiny ghost danger" @click="removeGroup(gi)">{{ t('Remove', 'Retirer') }}</button>
           </div>
 
           <div v-if="group.categories.length" class="group-chips">
@@ -92,7 +88,7 @@
           </div>
 
           <div v-if="expanded.has(gi)" class="group-picker">
-            <input type="text" class="cat-filter" v-model="groupFilters[gi]" placeholder="Filter categories…"
+            <input type="text" class="cat-filter" v-model="groupFilters[gi]" :placeholder="t('Filter categories…', 'Filtrer les catégories…')"
               autocomplete="off">
             <div class="cat-list">
               <label v-for="cat in filteredForGroup(gi)" :key="cat.type + '::' + cat.name" class="cat-item"
@@ -106,13 +102,13 @@
           </div>
         </div>
 
-        <button type="button" class="btn ghost add-group" @click="addGroup">+ Add catalog</button>
+        <button type="button" class="btn ghost add-group" @click="addGroup">+ {{ t('Add catalog', 'Ajouter un catalogue') }}</button>
 
         <small v-if="groups.length === 0" class="hint">
-          Add at least one catalog and assign it some categories.
+          {{ t('Add at least one catalog and assign it some categories.', 'Ajoutez au moins un catalogue et affectez-lui des catégories.') }}
         </small>
         <small v-else-if="!hasValidGroup" class="hint warn">
-          Give each catalog a name and at least one category, otherwise it is ignored.
+          {{ t('Give each catalog a name and at least one category, otherwise it is ignored.', 'Donnez un nom et au moins une catégorie à chaque catalogue, sinon il est ignoré.') }}
         </small>
       </div>
     </template>
@@ -121,7 +117,10 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useI18n } from '../composables/useI18n'
 import type { CatalogMode, CatalogGroup } from '../types/config'
+
+const { t } = useI18n()
 
 export type CategoryType = 'tv' | 'movie' | 'series'
 
@@ -150,19 +149,19 @@ const splitWarnThreshold = 25
 const filter = ref('')
 const typeFilter = ref<'all' | CategoryType>('all')
 
-const typeFilters = [
-  { value: 'all' as const, label: 'All' },
+const typeFilters = computed(() => [
+  { value: 'all' as const, label: t('All', 'Tous') },
   { value: 'tv' as const, label: 'TV' },
-  { value: 'movie' as const, label: 'Movies' },
-  { value: 'series' as const, label: 'Series' },
-]
+  { value: 'movie' as const, label: t('Movies', 'Films') },
+  { value: 'series' as const, label: t('Series', 'Séries') },
+])
 
 const modeName = computed(() => props.modeName || 'catalogMode')
 const selectedSet = computed(() => new Set(props.modelValue))
 const hasTypes = computed(() => props.categories.some(c => c.type && c.type !== 'tv'))
 
-function typeLabel(t?: CategoryType) {
-  return t === 'movie' ? 'Movie' : t === 'series' ? 'Series' : 'TV'
+function typeLabel(ct?: CategoryType) {
+  return ct === 'movie' ? t('Movie', 'Film') : ct === 'series' ? t('Series', 'Série') : 'TV'
 }
 
 function countByType(t: 'all' | CategoryType) {

@@ -1,7 +1,7 @@
 <template>
   <form class="config-form" autocomplete="off">
     <fieldset>
-      <legend>Playlist</legend>
+      <legend>{{ t('Playlist', 'Playlist') }}</legend>
 
       <div class="info-banner">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -45,7 +45,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>Categories</legend>
+      <legend>{{ t('Categories', 'Catégories') }}</legend>
       <div class="info-banner">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -60,7 +60,7 @@
 
       <div class="form-group">
         <button type="button" class="btn ghost" :disabled="loadingCats" @click="loadCategories">
-          {{ loadingCats ? 'Loading…' : (categoriesLoaded ? 'Reload categories' : 'Load categories') }}
+          {{ loadingCats ? t('Loading…', 'Chargement…') : (categoriesLoaded ? t('Reload categories', 'Recharger les catégories') : t('Load categories', 'Charger les catégories')) }}
         </button>
         <small v-if="catsError" class="hint warn">{{ catsError }}</small>
       </div>
@@ -76,7 +76,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>EPG Options</legend>
+      <legend>{{ t('EPG Options', 'Options EPG') }}</legend>
 
       <div class="form-group checkbox-line">
         <input type="checkbox" id="m3uEnableEpg" v-model="form.enableEpg">
@@ -120,7 +120,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>Advanced</legend>
+      <legend>{{ t('Advanced', 'Avancé') }}</legend>
       <div class="form-group">
         <label class="group-label">Global User-Agent
           <span class="hint"> — leave blank unless your provider requires a specific player</span>
@@ -153,7 +153,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>Display</legend>
+      <legend>{{ t('Display', 'Affichage') }}</legend>
       <div class="form-group">
         <label for="m3uCatalogName">Catalog Name</label>
         <input type="text" id="m3uCatalogName" v-model="form.catalogName"
@@ -163,9 +163,9 @@
     </fieldset>
 
     <div class="form-actions">
-      <button class="btn ghost" type="button" @click="handleSave">Save configuration</button>
+      <button class="btn ghost" type="button" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
       <button class="btn primary" type="button" @click="handleInstall">
-        Install Addon
+        {{ t('Install Addon', 'Installer l\'addon') }}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 12h14M12 5l7 7-7 7"/>
@@ -179,6 +179,7 @@
 import { reactive, ref, inject, onMounted } from 'vue'
 import { usePublicPlaylists } from '../composables/usePublicPlaylists'
 import { useDecodedToken } from '../composables/useDecodedToken'
+import { useI18n } from '../composables/useI18n'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
@@ -186,6 +187,7 @@ import type { M3uConfig, CatalogMode, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
 const { playlists } = usePublicPlaylists()
+const { t } = useI18n()
 
 const USER_AGENT_PRESETS = [
   { label: 'TiviMate',         value: 'TiviMate/4.7.0 (Android)' },

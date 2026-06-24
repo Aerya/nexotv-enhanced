@@ -34,6 +34,8 @@ fonctionnalités au-dessus du code amont.
 | **Recherche** | Match **insensible aux accents/séparateurs** (`tf 1` ≈ `TF1`, `asterix` ≈ `Astérix`). |
 | **Authentification** | **Mot de passe unique** optionnel sur la webui. |
 | **Sauvegarde** | **Configurations sauvegardées côté serveur** (nommées, rechargeables). |
+| **Synopsis** | Films & séries avec **synopsis** (genres, casting, réalisateur, année) récupérés à l'ouverture de la fiche. |
+| **Langue** | Sélecteur **EN / FR** dans l'en-tête (mémorisé dans le navigateur). |
 | **Affichage** | Logos de chaînes en affiches carrées ; nom de l'addon `NexoTV-Enhanced`. |
 
 > Entièrement **rétrocompatible** : sans sélection de catégories, le comportement reste celui de
