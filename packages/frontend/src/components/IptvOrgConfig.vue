@@ -71,7 +71,7 @@
       <div class="form-group">
         <label for="iptvCatalogName">Catalog Name</label>
         <input type="text" id="iptvCatalogName" v-model="catalogName"
-          placeholder="NexoTV Enhanced">
+          placeholder="NexoTV-Enhanced">
         <small class="hint">Name shown in Stremio's channel list. Leave blank to use the default.</small>
       </div>
     </fieldset>
