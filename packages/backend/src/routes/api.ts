@@ -8,6 +8,7 @@ import {
     sessionCookieHeader, requireAuth,
 } from '../utils/webauth';
 import { loginLimiter } from '../middleware/rateLimiter';
+import { listConfigs, getConfig, saveConfig, deleteConfig } from '../utils/configStore';
 
 const router = Router();
 
@@ -30,6 +31,35 @@ router.post('/api/login', loginLimiter, (req, res) => {
 router.post('/api/logout', (req, res) => {
     res.setHeader('Set-Cookie', sessionCookieHeader(null, !!req.secure));
     res.json({ ok: true });
+});
+
+// ── Saved configurations (server-side, gated) ─────────────────────────────────
+router.get('/api/configs', requireAuth, (_req, res) => {
+    res.json({ configs: listConfigs() });
+});
+
+router.get('/api/configs/:id', requireAuth, (req, res) => {
+    const config = getConfig(req.params.id);
+    if (!config) return res.status(404).json({ error: 'Not found' });
+    res.json({ config });
+});
+
+router.post('/api/configs', requireAuth, (req, res) => {
+    const { name, config, id } = req.body || {};
+    if (!config || typeof config !== 'object') {
+        return res.status(400).json({ error: 'Missing config' });
+    }
+    try {
+        const meta = saveConfig(name, config, id);
+        res.json({ ok: true, ...meta });
+    } catch (e: any) {
+        res.status(500).json({ error: 'Save failed' });
+    }
+});
+
+router.delete('/api/configs/:id', requireAuth, (req, res) => {
+    const removed = deleteConfig(req.params.id);
+    res.json({ ok: true, removed });
 });
 
 router.post('/encrypt', requireAuth, (req, res) => {
