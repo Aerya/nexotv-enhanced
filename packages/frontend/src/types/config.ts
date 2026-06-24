@@ -28,6 +28,7 @@ export interface MultiConfig {
   catalogMode?: CatalogMode;
   selectedCategories?: string[];
   categoryTypes?: Record<string, CategoryType>;
+  catalogGroups?: CatalogGroup[];
   streamSelection?: StreamSelection;
   reformatLogos?: boolean;
 }
