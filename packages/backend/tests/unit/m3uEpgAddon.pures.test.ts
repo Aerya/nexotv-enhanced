@@ -30,6 +30,7 @@ vi.mock('../../src/utils/sqliteCache', () => ({
 vi.mock('../../src/providers/xtreamProvider', () => ({
   fetchData: vi.fn(),
   fetchSeriesEpisodes: vi.fn(async () => ({ episodes: [], info: null })),
+  fetchVodInfo: vi.fn(async () => null),
 }));
 vi.mock('../../src/providers/iptvOrgProvider', () => ({ fetchData: vi.fn() }));
 vi.mock('../../src/providers/m3uProvider', () => ({ fetchData: vi.fn() }));

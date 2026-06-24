@@ -100,6 +100,7 @@ async function fetchXtreamSource(src: any, idPrefix: string, log: any): Promise<
                     logo: v.stream_icon || v.cover,
                     category: cat,
                     source: tag,
+                    srcVodId: String(v.stream_id),
                     plot: v.plot || '',
                     attributes: { 'tvg-logo': v.stream_icon || v.cover, 'group-title': cat },
                 });
