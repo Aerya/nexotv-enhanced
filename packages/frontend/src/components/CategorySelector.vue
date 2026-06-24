@@ -1,40 +1,6 @@
 <template>
   <div class="category-selector">
-    <div class="cat-toolbar">
-      <input
-        type="text"
-        class="cat-filter"
-        v-model="filter"
-        placeholder="Filter categories…"
-        autocomplete="off"
-      >
-      <span class="cat-count">{{ selectedSet.size }} / {{ categories.length }} selected</span>
-    </div>
-
-    <div class="cat-actions">
-      <button type="button" class="btn tiny ghost" @click="selectAll">Select all</button>
-      <button type="button" class="btn tiny ghost" @click="selectNone">Select none</button>
-      <button type="button" class="btn tiny ghost" @click="invert">Invert</button>
-    </div>
-
-    <div class="cat-list">
-      <label
-        v-for="cat in filtered"
-        :key="cat.name"
-        class="cat-item"
-        :class="{ checked: selectedSet.has(cat.name) }"
-      >
-        <input
-          type="checkbox"
-          :checked="selectedSet.has(cat.name)"
-          @change="toggle(cat.name)"
-        >
-        <span class="cat-name" :title="cat.name">{{ cat.name }}</span>
-        <span v-if="cat.count != null" class="cat-badge">{{ cat.count }}</span>
-      </label>
-      <p v-if="filtered.length === 0" class="cat-empty">No category matches “{{ filter }}”.</p>
-    </div>
-
+    <!-- Catalog layout chooser -->
     <div class="form-group">
       <label class="group-label">Catalog layout</label>
       <div class="radio-group">
@@ -54,17 +20,92 @@
             Stremio catalog row.
           </span>
         </label>
+        <label class="checkbox-line">
+          <input type="radio" :name="modeName" value="custom"
+            :checked="mode === 'custom'" @change="$emit('update:mode', 'custom')">
+          <span class="checkbox-label">
+            <strong>Custom catalogs</strong> — build your own catalogs, each grouping one or more
+            categories.
+          </span>
+        </label>
       </div>
+    </div>
+
+    <!-- single / split: simple category picker -->
+    <template v-if="mode !== 'custom'">
+      <div class="cat-toolbar">
+        <input type="text" class="cat-filter" v-model="filter" placeholder="Filter categories…" autocomplete="off">
+        <span class="cat-count">{{ selectedSet.size }} / {{ categories.length }} selected</span>
+      </div>
+
+      <div class="cat-actions">
+        <button type="button" class="btn tiny ghost" @click="selectAll">Select all</button>
+        <button type="button" class="btn tiny ghost" @click="selectNone">Select none</button>
+        <button type="button" class="btn tiny ghost" @click="invert">Invert</button>
+      </div>
+
+      <div class="cat-list">
+        <label v-for="cat in filtered" :key="cat.name" class="cat-item" :class="{ checked: selectedSet.has(cat.name) }">
+          <input type="checkbox" :checked="selectedSet.has(cat.name)" @change="toggle(cat.name)">
+          <span class="cat-name" :title="cat.name">{{ cat.name }}</span>
+          <span v-if="cat.count != null" class="cat-badge">{{ cat.count }}</span>
+        </label>
+        <p v-if="filtered.length === 0" class="cat-empty">No category matches “{{ filter }}”.</p>
+      </div>
+
       <small v-if="mode === 'split' && selectedSet.size > splitWarnThreshold" class="hint warn">
         {{ selectedSet.size }} categories selected — that's a lot of catalog rows in Stremio.
       </small>
-    </div>
+    </template>
+
+    <!-- custom: catalog groups editor -->
+    <template v-else>
+      <div class="groups-editor">
+        <div v-for="(group, gi) in groups" :key="gi" class="group-card">
+          <div class="group-head">
+            <input type="text" class="group-name" :value="group.name"
+              placeholder="Catalog name" @input="setGroupName(gi, ($event.target as HTMLInputElement).value)">
+            <span class="cat-badge">{{ group.categories.length }} cat.</span>
+            <button type="button" class="btn tiny ghost" @click="toggleExpanded(gi)">
+              {{ expanded.has(gi) ? 'Hide' : 'Pick categories' }}
+            </button>
+            <button type="button" class="btn tiny ghost danger" @click="removeGroup(gi)">Remove</button>
+          </div>
+
+          <div v-if="group.categories.length" class="group-chips">
+            <span v-for="c in group.categories" :key="c" class="group-chip">{{ c }}</span>
+          </div>
+
+          <div v-if="expanded.has(gi)" class="group-picker">
+            <input type="text" class="cat-filter" v-model="groupFilters[gi]" placeholder="Filter categories…"
+              autocomplete="off">
+            <div class="cat-list">
+              <label v-for="cat in filteredForGroup(gi)" :key="cat.name" class="cat-item"
+                :class="{ checked: groupHas(gi, cat.name) }">
+                <input type="checkbox" :checked="groupHas(gi, cat.name)" @change="toggleGroupCategory(gi, cat.name)">
+                <span class="cat-name" :title="cat.name">{{ cat.name }}</span>
+                <span v-if="cat.count != null" class="cat-badge">{{ cat.count }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn ghost add-group" @click="addGroup">+ Add catalog</button>
+
+        <small v-if="groups.length === 0" class="hint">
+          Add at least one catalog and assign it some categories.
+        </small>
+        <small v-else-if="!hasValidGroup" class="hint warn">
+          Give each catalog a name and at least one category, otherwise it is ignored.
+        </small>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import type { CatalogMode } from '../types/config'
+import { computed, reactive, ref } from 'vue'
+import type { CatalogMode, CatalogGroup } from '../types/config'
 
 export interface CategoryEntry {
   name: string
@@ -75,6 +116,7 @@ const props = defineProps<{
   categories: CategoryEntry[]
   modelValue: string[]
   mode: CatalogMode
+  groups: CatalogGroup[]
   /** unique radio group name so multiple selectors on a page don't clash */
   modeName?: string
 }>()
@@ -82,6 +124,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string[]): void
   (e: 'update:mode', value: CatalogMode): void
+  (e: 'update:groups', value: CatalogGroup[]): void
 }>()
 
 const splitWarnThreshold = 25
@@ -104,7 +147,6 @@ function toggle(name: string) {
 }
 
 function selectAll() {
-  // Add every currently filtered category to the existing selection.
   const set = new Set(props.modelValue)
   for (const c of filtered.value) set.add(c.name)
   emit('update:modelValue', [...set])
@@ -112,7 +154,6 @@ function selectAll() {
 
 function selectNone() {
   if (filter.value.trim()) {
-    // Only clear the filtered subset.
     const filteredNames = new Set(filtered.value.map(c => c.name))
     emit('update:modelValue', props.modelValue.filter(n => !filteredNames.has(n)))
   } else {
@@ -127,6 +168,68 @@ function invert() {
     else set.add(c.name)
   }
   emit('update:modelValue', [...set])
+}
+
+/* ---- custom groups ---- */
+
+const expanded = reactive(new Set<number>())
+const groupFilters = reactive<Record<number, string>>({})
+
+const hasValidGroup = computed(() =>
+  props.groups.some(g => g.name.trim() && g.categories.length > 0)
+)
+
+function emitGroups(next: CatalogGroup[]) {
+  emit('update:groups', next)
+}
+
+function addGroup() {
+  const next = props.groups.map(g => ({ name: g.name, categories: [...g.categories] }))
+  next.push({ name: `Catalog ${next.length + 1}`, categories: [] })
+  emitGroups(next)
+  expanded.add(next.length - 1)
+}
+
+function removeGroup(gi: number) {
+  const next = props.groups
+    .filter((_, i) => i !== gi)
+    .map(g => ({ name: g.name, categories: [...g.categories] }))
+  expanded.delete(gi)
+  emitGroups(next)
+}
+
+function setGroupName(gi: number, name: string) {
+  const next = props.groups.map((g, i) => ({
+    name: i === gi ? name : g.name,
+    categories: [...g.categories],
+  }))
+  emitGroups(next)
+}
+
+function toggleExpanded(gi: number) {
+  if (expanded.has(gi)) expanded.delete(gi)
+  else expanded.add(gi)
+}
+
+function groupHas(gi: number, name: string) {
+  return props.groups[gi]?.categories.includes(name) ?? false
+}
+
+function toggleGroupCategory(gi: number, name: string) {
+  const next = props.groups.map((g, i) => {
+    if (i !== gi) return { name: g.name, categories: [...g.categories] }
+    const set = new Set(g.categories)
+    if (set.has(name)) set.delete(name)
+    else set.add(name)
+    return { name: g.name, categories: [...set] }
+  })
+  emitGroups(next)
+}
+
+function filteredForGroup(gi: number) {
+  const q = (groupFilters[gi] || '').trim().toLowerCase()
+  if (!q) return props.categories
+  return props.categories.filter(c => c.name.toLowerCase().includes(q))
 }
 </script>
 
@@ -203,5 +306,52 @@ function invert() {
 }
 .hint.warn {
   color: #fbbf24;
+}
+
+/* custom groups */
+.groups-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.group-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.group-name {
+  flex: 1;
+  min-width: 140px;
+}
+.group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.group-chip {
+  font-size: 0.72rem;
+  background: rgba(99, 102, 241, 0.16);
+  border-radius: 10px;
+  padding: 0.1rem 0.55rem;
+}
+.group-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.btn.tiny.danger {
+  color: #f87171;
+}
+.add-group {
+  align-self: flex-start;
 }
 </style>

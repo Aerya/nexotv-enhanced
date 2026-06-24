@@ -41,8 +41,13 @@ export interface AddonConfig {
     globalUserAgent?: string;
     /** Categories the user picked on the config page. Empty/undefined = all. */
     selectedCategories?: string[];
-    /** 'single' = one combined catalog, 'split' = one catalog per category. */
-    catalogMode?: 'single' | 'split';
+    /**
+     * 'single' = one combined catalog, 'split' = one catalog per category,
+     * 'custom' = one catalog per user-defined group (see catalogGroups).
+     */
+    catalogMode?: 'single' | 'split' | 'custom';
+    /** User-defined catalogs, each grouping one or more categories. */
+    catalogGroups?: Array<{ name: string; categories: string[] }>;
 }
 
 /** Read a channel's category, regardless of provider shape. */
@@ -54,14 +59,28 @@ function stableStringify(obj: any) {
     return JSON.stringify(obj, Object.keys(obj).sort());
 }
 
-/** Normalize the selected categories into a stable, comparable form. */
+/** Normalize the catalog selection into a stable, comparable form for the cache key. */
 function normalizeSelection(config: AddonConfig) {
     const cats = (config.selectedCategories || [])
         .map(c => (typeof c === 'string' ? c.trim() : ''))
         .filter(Boolean);
+    const mode = config.catalogMode === 'split' ? 'split'
+        : config.catalogMode === 'custom' ? 'custom'
+            : 'single';
+    // Group order is meaningful (it maps to catalog ids) so it is preserved;
+    // only the inner categories are de-duped + sorted.
+    const groups = (config.catalogGroups || [])
+        .map(g => ({
+            name: (g?.name || '').trim(),
+            categories: [...new Set((g?.categories || [])
+                .map(c => (typeof c === 'string' ? c.trim() : ''))
+                .filter(Boolean))].sort(),
+        }))
+        .filter(g => g.name && g.categories.length > 0);
     return {
-        catalogMode: config.catalogMode === 'split' ? 'split' : 'single',
+        catalogMode: mode,
         selectedCategories: [...new Set(cats)].sort(),
+        catalogGroups: groups,
     };
 }
 
@@ -247,16 +266,38 @@ export class M3UEPGAddon {
         });
     }
 
-    /** In 'split' mode, map a per-category catalog id back to its category name. */
-    getCategoryForCatalogId(id: string): string | null {
-        if (this.config.catalogMode !== 'split') return null;
-        if (!id.startsWith('iptv_cat_')) return null;
-        const idx = parseInt(id.slice('iptv_cat_'.length), 10);
-        if (!Number.isInteger(idx)) return null;
-        const cats = (this.config.selectedCategories || [])
-            .map(c => (typeof c === 'string' ? c.trim() : ''))
-            .filter(Boolean);
-        return cats[idx] ?? null;
+    /**
+     * Map a per-catalog id back to the set of categories it should contain.
+     * - 'split' : `iptv_cat_<n>` → the Nth selected category
+     * - 'custom': `iptv_grp_<n>` → the Nth group's categories
+     * Returns null for the combined catalog (single/legacy), handled separately.
+     */
+    getCategoriesForCatalogId(id: string): Set<string> | null {
+        const mode = this.config.catalogMode;
+        if (mode === 'split' && id.startsWith('iptv_cat_')) {
+            const idx = parseInt(id.slice('iptv_cat_'.length), 10);
+            if (!Number.isInteger(idx)) return null;
+            const cats = (this.config.selectedCategories || [])
+                .map(c => (typeof c === 'string' ? c.trim() : ''))
+                .filter(Boolean);
+            const cat = cats[idx];
+            return cat ? new Set([cat]) : null;
+        }
+        if (mode === 'custom' && id.startsWith('iptv_grp_')) {
+            const idx = parseInt(id.slice('iptv_grp_'.length), 10);
+            if (!Number.isInteger(idx)) return null;
+            const groups = (this.config.catalogGroups || [])
+                .map(g => ({
+                    name: (g?.name || '').trim(),
+                    categories: (g?.categories || [])
+                        .map(c => (typeof c === 'string' ? c.trim() : ''))
+                        .filter(Boolean),
+                }))
+                .filter(g => g.name && g.categories.length > 0);
+            const group = groups[idx];
+            return group ? new Set(group.categories) : null;
+        }
+        return null;
     }
 
     buildGenresInManifest() {

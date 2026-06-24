@@ -1,11 +1,17 @@
 import env from '../config/env';
 
-export type CatalogMode = 'single' | 'split';
+export type CatalogMode = 'single' | 'split' | 'custom';
+
+export interface CatalogGroup {
+    name: string;
+    categories: string[];
+}
 
 export interface ManifestOptions {
     catalogName?: string;
     catalogMode?: CatalogMode;
     selectedCategories?: string[];
+    catalogGroups?: CatalogGroup[];
 }
 
 /** Catalog id used in "single" mode (one combined catalog). */
@@ -16,13 +22,62 @@ export function catalogIdForIndex(index: number) {
     return `iptv_cat_${index}`;
 }
 
-function buildCatalogs(opts: ManifestOptions) {
-    const mode: CatalogMode = opts.catalogMode === 'split' ? 'split' : 'single';
-    const categories = (opts.selectedCategories || [])
+/** Deterministic catalog id for the Nth custom group in "custom" mode. */
+export function groupCatalogIdForIndex(index: number) {
+    return `iptv_grp_${index}`;
+}
+
+function cleanCategories(list: string[] | undefined): string[] {
+    return (list || [])
         .map(c => (typeof c === 'string' ? c.trim() : ''))
         .filter(Boolean);
+}
 
-    // One catalog per selected category.
+/** Extra/genre block: adds a genre filter only when there are >1 categories. */
+function catalogExtra(categories: string[]) {
+    if (categories.length > 1) {
+        const genres = ['All Channels', ...categories];
+        return {
+            extra: [
+                { name: 'genre', isRequired: false, options: genres },
+                { name: 'search', isRequired: false },
+                { name: 'skip' }
+            ],
+            genres
+        };
+    }
+    return {
+        extra: [
+            { name: 'search', isRequired: false },
+            { name: 'skip' }
+        ]
+    };
+}
+
+function buildCatalogs(opts: ManifestOptions) {
+    const mode: CatalogMode =
+        opts.catalogMode === 'split' ? 'split'
+            : opts.catalogMode === 'custom' ? 'custom'
+                : 'single';
+    const categories = cleanCategories(opts.selectedCategories);
+
+    // Custom mode: one catalog per user-defined group of categories.
+    if (mode === 'custom') {
+        const groups = (opts.catalogGroups || [])
+            .map(g => ({ name: (g?.name || '').trim(), categories: cleanCategories(g?.categories) }))
+            .filter(g => g.name && g.categories.length > 0);
+        if (groups.length > 0) {
+            return groups.map((g, i) => ({
+                type: 'tv',
+                id: groupCatalogIdForIndex(i),
+                name: opts.catalogName ? `${opts.catalogName} · ${g.name}` : g.name,
+                ...catalogExtra(g.categories)
+            }));
+        }
+        // No valid group → fall through to a single combined catalog.
+    }
+
+    // Split mode: one catalog per selected category.
     if (mode === 'split' && categories.length > 0) {
         return categories.map((cat, i) => ({
             type: 'tv',

@@ -46,6 +46,7 @@
         v-if="categoriesLoaded"
         v-model="form.selectedCategories"
         v-model:mode="form.catalogMode"
+        v-model:groups="form.catalogGroups"
         :categories="categories"
         modeName="xtreamCatalogMode"
       />
@@ -119,7 +120,7 @@ import { reactive, ref, inject, onMounted } from 'vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAddonInfo } from '../composables/useAddonInfo'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
-import type { XtreamConfig, CatalogMode } from '../types/config'
+import type { XtreamConfig, CatalogMode, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
 const { info: addonInfo } = useAddonInfo()
@@ -140,6 +141,7 @@ const form = reactive({
   catalogName: '',
   selectedCategories: [] as string[],
   catalogMode: 'single' as CatalogMode,
+  catalogGroups: [] as CatalogGroup[],
 })
 
 // Category loading state
@@ -169,11 +171,19 @@ onMounted(() => {
   form.epgOffsetHours = d.epgOffsetHours ?? 0
   form.reformatLogos = !!d.reformatLogos
   form.catalogName = (decodedConfig as any).catalogName || ''
-  form.catalogMode = d.catalogMode === 'split' ? 'split' : 'single'
+  form.catalogMode = d.catalogMode === 'split' ? 'split'
+    : d.catalogMode === 'custom' ? 'custom' : 'single'
+  if (Array.isArray(d.catalogGroups) && d.catalogGroups.length) {
+    form.catalogGroups = d.catalogGroups.map(g => ({ name: g.name, categories: [...g.categories] }))
+  }
   if (Array.isArray(d.selectedCategories) && d.selectedCategories.length) {
     form.selectedCategories = [...d.selectedCategories]
-    // Seed the selector with the saved categories so it renders without a reload.
-    categories.value = d.selectedCategories.map(name => ({ name }))
+  }
+  // Seed the selector with the saved categories so it renders without a reload.
+  const seed = new Set<string>(d.selectedCategories || [])
+  for (const g of (d.catalogGroups || [])) for (const c of g.categories) seed.add(c)
+  if (seed.size) {
+    categories.value = [...seed].sort().map(name => ({ name }))
     categoriesLoaded.value = true
   }
 })
@@ -415,10 +425,20 @@ async function handleSubmit() {
     if (isFinite(epgOffset) && epgOffset !== 0) config.epgOffsetHours = epgOffset
 
     // Only keep categories that still exist in the panel.
-    const validSelected = form.selectedCategories.filter(c => categorySet.has(c))
-    if (validSelected.length > 0) {
-      config.selectedCategories = validSelected
-      config.catalogMode = form.catalogMode
+    if (form.catalogMode === 'custom') {
+      const groups = form.catalogGroups
+        .map(g => ({ name: g.name.trim(), categories: g.categories.filter(c => categorySet.has(c)) }))
+        .filter(g => g.name && g.categories.length > 0)
+      if (groups.length > 0) {
+        config.catalogMode = 'custom'
+        config.catalogGroups = groups
+      }
+    } else {
+      const validSelected = form.selectedCategories.filter(c => categorySet.has(c))
+      if (validSelected.length > 0) {
+        config.selectedCategories = validSelected
+        config.catalogMode = form.catalogMode
+      }
     }
 
     config.prescan = {
