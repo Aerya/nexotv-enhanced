@@ -16,6 +16,7 @@ async function createAddon(config: AddonConfig) {
         catalogMode: config.catalogMode,
         selectedCategories: config.selectedCategories,
         catalogGroups: config.catalogGroups,
+        categoryTypes: config.categoryTypes,
     });
     const debugFlag = !!env.DEBUG;
     if (debugFlag) {
@@ -54,22 +55,10 @@ async function createAddon(config: AddonConfig) {
             const start = Date.now();
             try {
                 await addonInstance.refreshOnFirstCatalogRequest();
-                const channels = await addonInstance.getChannelsForCatalog();
-                let items: any[] = [];
-                if (args.type === 'tv') {
-                    const catSet = addonInstance.getCategoriesForCatalogId(args.id);
-                    if (catSet) {
-                        // 'split'/'custom' mode: a catalog dedicated to one or more
-                        // categories (one category for split, a group for custom).
-                        items = channels.filter((c: any) =>
-                            catSet.has(c.category || c.attributes?.['group-title'])
-                        );
-                    } else if (args.id === 'iptv_channels' || args.id === 'iptv_org') {
-                        // 'single' mode (or legacy): the combined catalog, limited
-                        // to the user's selected categories when they picked a subset.
-                        items = addonInstance.filterBySelectedCategories(channels);
-                    }
-                }
+                await addonInstance.getChannelsForCatalog();
+                // itemsForCatalog resolves the catalog id to its media type +
+                // category set and filters the loaded channels accordingly.
+                let items: any[] = addonInstance.itemsForCatalog(args.id);
                 const extra = args.extra || {};
                 if (extra.genre && extra.genre !== 'All Channels') {
                     items = items.filter((i: any) =>

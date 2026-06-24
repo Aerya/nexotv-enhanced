@@ -1,6 +1,7 @@
 import env from '../config/env';
 
 export type CatalogMode = 'single' | 'split' | 'custom';
+export type MediaType = 'tv' | 'movie' | 'series';
 
 export interface CatalogGroup {
     name: string;
@@ -12,9 +13,11 @@ export interface ManifestOptions {
     catalogMode?: CatalogMode;
     selectedCategories?: string[];
     catalogGroups?: CatalogGroup[];
+    /** Category name → media type. Missing entries default to 'tv'. */
+    categoryTypes?: Record<string, MediaType>;
 }
 
-/** Catalog id used in "single" mode (one combined catalog). */
+/** Catalog id used in "single" mode for live TV (kept stable for back-compat). */
 export const SINGLE_CATALOG_ID = 'iptv_channels';
 
 /** Deterministic catalog id for the Nth selected category in "split" mode. */
@@ -31,6 +34,19 @@ function cleanCategories(list: string[] | undefined): string[] {
     return (list || [])
         .map(c => (typeof c === 'string' ? c.trim() : ''))
         .filter(Boolean);
+}
+
+function typeOf(name: string, types?: Record<string, MediaType>): MediaType {
+    return (types?.[name] as MediaType) || 'tv';
+}
+
+/** Dominant media type among a list of categories. */
+function dominantType(categories: string[], types?: Record<string, MediaType>): MediaType {
+    const tally: Record<MediaType, number> = { tv: 0, movie: 0, series: 0 };
+    for (const c of categories) tally[typeOf(c, types)]++;
+    if (tally.series >= tally.movie && tally.series > tally.tv) return 'series';
+    if (tally.movie >= tally.series && tally.movie > tally.tv) return 'movie';
+    return 'tv';
 }
 
 /** Extra/genre block: adds a genre filter only when there are >1 categories. */
@@ -60,6 +76,8 @@ function buildCatalogs(opts: ManifestOptions) {
             : opts.catalogMode === 'custom' ? 'custom'
                 : 'single';
     const categories = cleanCategories(opts.selectedCategories);
+    const types = opts.categoryTypes;
+    const baseName = opts.catalogName || env.ADDON_NAME;
 
     // Custom mode: one catalog per user-defined group of categories.
     if (mode === 'custom') {
@@ -68,7 +86,7 @@ function buildCatalogs(opts: ManifestOptions) {
             .filter(g => g.name && g.categories.length > 0);
         if (groups.length > 0) {
             return groups.map((g, i) => ({
-                type: 'tv',
+                type: dominantType(g.categories, types),
                 id: groupCatalogIdForIndex(i),
                 name: opts.catalogName ? `${opts.catalogName} · ${g.name}` : g.name,
                 ...catalogExtra(g.categories)
@@ -77,10 +95,10 @@ function buildCatalogs(opts: ManifestOptions) {
         // No valid group → fall through to a single combined catalog.
     }
 
-    // Split mode: one catalog per selected category.
+    // Split mode: one catalog per selected category (typed individually).
     if (mode === 'split' && categories.length > 0) {
         return categories.map((cat, i) => ({
-            type: 'tv',
+            type: typeOf(cat, types),
             id: catalogIdForIndex(i),
             name: opts.catalogName ? `${opts.catalogName} · ${cat}` : cat,
             extra: [
@@ -90,35 +108,60 @@ function buildCatalogs(opts: ManifestOptions) {
         }));
     }
 
-    // Single combined catalog. When the user selected a subset of categories
-    // those become the genre options; otherwise genres are filled at runtime
-    // from the loaded channels (see M3UEPGAddon.buildGenresInManifest).
-    const genres = categories.length > 0 ? ['All Channels', ...categories] : [];
-    return [
-        {
+    // Single mode: one combined catalog per media type present in the selection.
+    const tvCats = categories.filter(c => typeOf(c, types) === 'tv');
+    const movieCats = categories.filter(c => typeOf(c, types) === 'movie');
+    const seriesCats = categories.filter(c => typeOf(c, types) === 'series');
+    const catalogs: any[] = [];
+
+    // TV catalog: always present (also the default when nothing is selected —
+    // genres are then filled at runtime from the loaded channels).
+    {
+        const genres = tvCats.length > 0 ? ['All Channels', ...tvCats] : [];
+        catalogs.push({
             type: 'tv',
             id: SINGLE_CATALOG_ID,
-            name: opts.catalogName || env.ADDON_NAME,
+            name: baseName,
             extra: [
                 { name: 'genre', isRequired: false, options: genres },
                 { name: 'search', isRequired: false },
                 { name: 'skip' }
             ],
             genres
-        }
-    ];
+        });
+    }
+    if (movieCats.length > 0) {
+        catalogs.push({
+            type: 'movie',
+            id: 'iptv_movies',
+            name: `${baseName} · Movies`,
+            ...catalogExtra(movieCats)
+        });
+    }
+    if (seriesCats.length > 0) {
+        catalogs.push({
+            type: 'series',
+            id: 'iptv_series',
+            name: `${baseName} · Series`,
+            ...catalogExtra(seriesCats)
+        });
+    }
+    return catalogs;
 }
 
 export function createManifest(idPrefix?: string, options?: ManifestOptions) {
     const opts = options || {};
+    const catalogs = buildCatalogs(opts);
+    // Declare every media type the catalogs expose (always include 'tv').
+    const types = [...new Set<string>(['tv', ...catalogs.map((c: any) => c.type)])];
     return {
         id: 'community.nexotv.enhanced',
         version: '2.0.0',
         name: env.ADDON_NAME,
         description: env.ADDON_DESCRIPTION,
         resources: ['catalog', 'stream', 'meta'],
-        types: ['tv'],
-        catalogs: buildCatalogs(opts),
+        types,
+        catalogs,
         idPrefixes: idPrefix ? [`xc${idPrefix}_`, `io${idPrefix}_`, `m3${idPrefix}_`] : ['xc', 'io', 'm3'],
         behaviorHints: {
             configurable: true,

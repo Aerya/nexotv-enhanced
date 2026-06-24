@@ -184,7 +184,8 @@ onMounted(() => {
   const seed = new Set<string>(d.selectedCategories || [])
   for (const g of (d.catalogGroups || [])) for (const c of g.categories) seed.add(c)
   if (seed.size) {
-    categories.value = [...seed].sort().map(name => ({ name }))
+    const savedTypes = d.categoryTypes || {}
+    categories.value = [...seed].sort().map(name => ({ name, type: savedTypes[name] || 'tv' }))
     categoriesLoaded.value = true
   }
 })
@@ -492,6 +493,7 @@ async function handleSubmit() {
     if (isFinite(epgOffset) && epgOffset !== 0) config.epgOffsetHours = epgOffset
 
     // Only keep categories that still exist in the panel.
+    const usedNames = new Set<string>()
     if (form.catalogMode === 'custom') {
       const groups = form.catalogGroups
         .map(g => ({ name: g.name.trim(), categories: g.categories.filter(c => categorySet.has(c)) }))
@@ -499,13 +501,24 @@ async function handleSubmit() {
       if (groups.length > 0) {
         config.catalogMode = 'custom'
         config.catalogGroups = groups
+        for (const g of groups) for (const c of g.categories) usedNames.add(c)
       }
     } else {
       const validSelected = form.selectedCategories.filter(c => categorySet.has(c))
       if (validSelected.length > 0) {
         config.selectedCategories = validSelected
         config.catalogMode = form.catalogMode
+        for (const c of validSelected) usedNames.add(c)
       }
+    }
+
+    // Carry the media type of each used category so the addon knows what to
+    // fetch (VOD / series) and which Stremio catalog type to expose.
+    if (usedNames.size > 0) {
+      const typeByName = new Map(categories.value.map(c => [c.name, c.type || 'tv']))
+      const categoryTypes: Record<string, 'tv' | 'movie' | 'series'> = {}
+      for (const name of usedNames) categoryTypes[name] = (typeByName.get(name) as any) || 'tv'
+      config.categoryTypes = categoryTypes
     }
 
     config.prescan = {

@@ -27,7 +27,10 @@ vi.mock('../../src/utils/sqliteCache', () => ({
   close: vi.fn(),
 }));
 
-vi.mock('../../src/providers/xtreamProvider', () => ({ fetchData: vi.fn() }));
+vi.mock('../../src/providers/xtreamProvider', () => ({
+  fetchData: vi.fn(),
+  fetchSeriesEpisodes: vi.fn(async () => ({ episodes: [], info: null })),
+}));
 vi.mock('../../src/providers/iptvOrgProvider', () => ({ fetchData: vi.fn() }));
 vi.mock('../../src/providers/m3uProvider', () => ({ fetchData: vi.fn() }));
 
@@ -136,6 +139,80 @@ describe('deriveFallbackLogoUrl', () => {
     const item = { name: 'Test', logo: 'https://i.imgur.com/abc123.png' };
     const url = addon.deriveFallbackLogoUrl(item);
     expect(url).toContain('wsrv.nl');
+  });
+});
+
+// ─── parseId ─────────────────────────────────────────────────────────────────
+
+describe('parseId', () => {
+  function addon() {
+    const a = new M3UEPGAddon({ provider: 'xtream' });
+    a.idPrefix = 'pfx';
+    return a;
+  }
+  it('parses live, movie, series and episode ids', () => {
+    const a = addon();
+    expect(a.parseId('xcpfx_123')).toEqual({ kind: 'tv', value: '123' });
+    expect(a.parseId('xcpfx_v_55')).toEqual({ kind: 'movie', value: '55' });
+    expect(a.parseId('xcpfx_s_9')).toEqual({ kind: 'series', value: '9' });
+    expect(a.parseId('xcpfx_e_4242_mkv')).toEqual({ kind: 'episode', value: '4242', ext: 'mkv' });
+  });
+  it('returns null for foreign ids', () => {
+    expect(addon().parseId('m3other_abc')).toBeNull();
+  });
+});
+
+// ─── resolveCatalog / itemsForCatalog ────────────────────────────────────────
+
+describe('resolveCatalog & itemsForCatalog', () => {
+  function addonWith(config: any) {
+    const a = new M3UEPGAddon({ provider: 'xtream', ...config });
+    a.channels = [
+      { id: 'a', category: 'News', mediaType: 'tv' },
+      { id: 'b', category: 'Action', mediaType: 'movie' },
+      { id: 'c', category: 'Drama', mediaType: 'series' },
+      { id: 'd', category: 'News', mediaType: 'tv' },
+    ];
+    return a;
+  }
+
+  it('single mode routes each type to its own catalog', () => {
+    const a = addonWith({
+      catalogMode: 'single',
+      selectedCategories: ['News', 'Action', 'Drama'],
+      categoryTypes: { News: 'tv', Action: 'movie', Drama: 'series' },
+    });
+    expect(a.itemsForCatalog('iptv_channels').map((i: any) => i.id)).toEqual(['a', 'd']);
+    expect(a.itemsForCatalog('iptv_movies').map((i: any) => i.id)).toEqual(['b']);
+    expect(a.itemsForCatalog('iptv_series').map((i: any) => i.id)).toEqual(['c']);
+  });
+
+  it('split mode filters by the catalog category and its type', () => {
+    const a = addonWith({
+      catalogMode: 'split',
+      selectedCategories: ['Action'],
+      categoryTypes: { Action: 'movie' },
+    });
+    const spec = a.resolveCatalog('iptv_cat_0');
+    expect(spec).toEqual({ cats: new Set(['Action']), type: 'movie' });
+    expect(a.itemsForCatalog('iptv_cat_0').map((i: any) => i.id)).toEqual(['b']);
+  });
+
+  it('returns empty for unknown catalog ids', () => {
+    expect(addonWith({ catalogMode: 'single' }).itemsForCatalog('nope')).toEqual([]);
+  });
+});
+
+// ─── generateMetaPreview (typed) ─────────────────────────────────────────────
+
+describe('generateMetaPreview typed', () => {
+  it('uses movie/series type and poster shape', () => {
+    const a = new M3UEPGAddon({ provider: 'xtream', reformatLogos: false });
+    const movie = a.generateMetaPreview({ id: 'm', name: 'Film', mediaType: 'movie', category: 'Action', logo: 'http://x/p.jpg' });
+    expect(movie.type).toBe('movie');
+    expect(movie.posterShape).toBe('poster');
+    const series = a.generateMetaPreview({ id: 's', name: 'Show', mediaType: 'series', category: 'Drama', logo: 'http://x/c.jpg' });
+    expect(series.type).toBe('series');
   });
 });
 
