@@ -5,6 +5,15 @@ import { createManifest } from './manifest';
 import { M3UEPGAddon, createCacheKey, buildPromiseCache, CACHE_ENABLED } from './M3UEPGAddon';
 import { AddonConfig } from './M3UEPGAddon';
 
+/** Lowercase, strip diacritics, drop non-alphanumerics — for fuzzy search. */
+function normalizeSearch(s: string): string {
+    return (s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '') // combining diacritical marks
+        .replace(/[^a-z0-9]+/g, '');
+}
+
 async function createAddon(config: AddonConfig) {
     config.instanceId = config.instanceId ||
         (crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(8).toString('hex'));
@@ -67,8 +76,10 @@ async function createAddon(config: AddonConfig) {
                     );
                 }
                 if (extra.search) {
-                    const q = extra.search.toLowerCase();
-                    items = items.filter((i: any) => i.name.toLowerCase().includes(q));
+                    // Accent- and separator-insensitive match: "tf 1" ≈ "TF1",
+                    // "asterix" ≈ "Astérix".
+                    const q = normalizeSearch(extra.search);
+                    if (q) items = items.filter((i: any) => normalizeSearch(i.name).includes(q));
                 }
                 const PAGE_SIZE = env.CATALOG_PAGE_SIZE;
                 const skip = parseInt(extra.skip || '0', 10) || 0;

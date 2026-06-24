@@ -49,6 +49,7 @@ export interface M3uConfig {
   selectedCategories?: string[];
   catalogMode?: CatalogMode;
   catalogGroups?: CatalogGroup[];
+  categoryTypes?: Record<string, CategoryType>;
 }
 
 export type AddonConfig = (XtreamConfig | IptvOrgConfig | M3uConfig) & { catalogName?: string };
