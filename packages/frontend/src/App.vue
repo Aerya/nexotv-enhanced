@@ -39,6 +39,13 @@
               @click="activeTab = 'm3u'">
               M3U / M3U+
             </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'multi' }"
+              id="tab-multi" role="tab"
+              :aria-selected="activeTab === 'multi'"
+              aria-controls="panel-multi"
+              @click="activeTab = 'multi'">
+              Multi-source
+            </button>
           </div>
 
           <!-- Tab Panels -->
@@ -55,6 +62,11 @@
           <div id="panel-m3u" class="tab-panel" :class="{ active: activeTab === 'm3u' }"
             role="tabpanel" aria-labelledby="tab-m3u">
             <M3uConfig v-if="activeTab === 'm3u'" />
+          </div>
+
+          <div id="panel-multi" class="tab-panel" :class="{ active: activeTab === 'multi' }"
+            role="tabpanel" aria-labelledby="tab-multi">
+            <MultiSourceConfig v-if="activeTab === 'multi'" />
           </div>
         </div>
       </section>
@@ -104,6 +116,7 @@ import SavedConfigs from './components/SavedConfigs.vue'
 import XtreamConfig from './components/XtreamConfig.vue'
 import IptvOrgConfig from './components/IptvOrgConfig.vue'
 import M3uConfig from './components/M3uConfig.vue'
+import MultiSourceConfig from './components/MultiSourceConfig.vue'
 import { useManifestPoll } from './composables/useManifestPoll'
 import { useConfigToken } from './composables/useConfigToken'
 import { useDecodedToken } from './composables/useDecodedToken'
@@ -134,7 +147,9 @@ onMounted(() => { auth.recheck() })
 // Reconfiguration: switch to the correct tab based on the decoded token
 onMounted(() => {
   const { decodedConfig } = useDecodedToken()
-  if (decodedConfig && decodedConfig.provider) {
+  if (decodedConfig && (decodedConfig as any).sources?.length) {
+    activeTab.value = 'multi'
+  } else if (decodedConfig && decodedConfig.provider) {
     activeTab.value = decodedConfig.provider as Provider
   }
 })
