@@ -157,7 +157,7 @@
       <div class="form-group">
         <label for="m3uCatalogName">Catalog Name</label>
         <input type="text" id="m3uCatalogName" v-model="form.catalogName"
-          placeholder="NexoTV">
+          placeholder="NexoTV Enhanced">
         <small class="hint">Name shown in Stremio's channel list. Leave blank to use the default.</small>
       </div>
     </fieldset>

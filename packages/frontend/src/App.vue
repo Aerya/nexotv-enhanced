@@ -63,7 +63,10 @@
             <li><strong>EPG offset</strong> – adjusts programme times for timezone correction.</li>
           </ul>
           <div class="credits">
-            <p>By <a href="https://github.com/joaosavi" target="_blank" rel="noopener">joaosavi</a></p>
+            <p>
+              By <a href="https://github.com/joaosavi" target="_blank" rel="noopener">joaosavi</a>
+              · Enhanced by <a href="https://github.com/Aerya/nexotv-enhanced" target="_blank" rel="noopener">Aerya</a>
+            </p>
           </div>
         </div>
       </section>
