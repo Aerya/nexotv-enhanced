@@ -492,11 +492,13 @@ async function handleSubmit() {
     if (enableEpgFinal && epgMode === 'custom' && customEpg) config.epgUrl = customEpg
     if (isFinite(epgOffset) && epgOffset !== 0) config.epgOffsetHours = epgOffset
 
-    // Only keep categories that still exist in the panel.
+    // Use the user's selection as-is. We intentionally do NOT filter against a
+    // freshly fetched category list: a transient fetch hiccup (e.g. get_vod_categories
+    // failing once) must never silently drop a whole group the user configured.
     const usedNames = new Set<string>()
     if (form.catalogMode === 'custom') {
       const groups = form.catalogGroups
-        .map(g => ({ name: g.name.trim(), categories: g.categories.filter(c => categorySet.has(c)) }))
+        .map(g => ({ name: g.name.trim(), categories: [...g.categories] }))
         .filter(g => g.name && g.categories.length > 0)
       if (groups.length > 0) {
         config.catalogMode = 'custom'
@@ -504,11 +506,11 @@ async function handleSubmit() {
         for (const g of groups) for (const c of g.categories) usedNames.add(c)
       }
     } else {
-      const validSelected = form.selectedCategories.filter(c => categorySet.has(c))
-      if (validSelected.length > 0) {
-        config.selectedCategories = validSelected
+      const selected = [...form.selectedCategories]
+      if (selected.length > 0) {
+        config.selectedCategories = selected
         config.catalogMode = form.catalogMode
-        for (const c of validSelected) usedNames.add(c)
+        for (const c of selected) usedNames.add(c)
       }
     }
 

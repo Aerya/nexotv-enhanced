@@ -12,6 +12,23 @@ async function withTimeout(url: string, options: any, ms: number) {
     }
 }
 
+/**
+ * Parse an Xtream date (ISO string, "0000-00-00", or unix seconds/ms) to an
+ * ISO string, or null if unusable. Avoids RangeError from new Date().toISOString().
+ */
+export function safeIsoDate(v: any): string | null {
+    if (v == null || v === '' || v === '0000-00-00' || v === '0000-00-00 00:00:00') return null;
+    const s = String(v).trim();
+    let d: Date;
+    if (/^\d+$/.test(s)) {
+        const n = Number(s);
+        d = new Date(n < 1e12 ? n * 1000 : n); // unix seconds vs ms
+    } else {
+        d = new Date(s);
+    }
+    return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 async function fetchJson(url: string, ms: number): Promise<any> {
     const resp = await withTimeout(url, {}, ms).catch(() => null);
     if (!resp || !resp.ok) return null;
@@ -81,7 +98,7 @@ export async function fetchSeriesEpisodes(config: any, seriesId: string) {
                 ext: (ep.container_extension || 'mp4').toString(),
                 thumbnail: ep.info?.movie_image || ep.info?.cover_big || null,
                 overview: ep.info?.plot || ep.info?.overview || '',
-                released: ep.info?.releasedate || ep.added || null,
+                released: safeIsoDate(ep.info?.releasedate ?? ep.added),
             });
         }
     }
