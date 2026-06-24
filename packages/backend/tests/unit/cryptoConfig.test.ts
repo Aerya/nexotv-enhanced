@@ -46,6 +46,21 @@ describe('cryptoConfig with CONFIG_SECRET enabled', () => {
       expect(t1).not.toBe(t2);
     });
 
+    it('compresses large repetitive configs into a much shorter token', () => {
+      const suffix = ' ( NETFLIX| PRIME | HBO | APPLE TV+ | STARZ | PARAMOUNT+ )';
+      const cats = Array.from({ length: 40 }, (_, i) => `CATEGORY ${i}${suffix}`);
+      const json = JSON.stringify({ provider: 'xtream', catalogGroups: [{ name: 'Séries', categories: cats }] });
+      const token = encryptConfig(json)!;
+      // The repetitive payload must shrink well below its raw size.
+      expect(token.length).toBeLessThan(json.length);
+      expect(decryptConfig(token)).toEqual(JSON.parse(json));
+    });
+
+    it('round-trips small configs (compression skipped) too', () => {
+      const json = '{"a":1}';
+      expect(decryptConfig(encryptConfig(json)!)).toEqual(JSON.parse(json));
+    });
+
     it('throws when ciphertext is tampered (auth tag failure)', () => {
       const token = encryptConfig('{"data":"secret"}')!;
       const b64part = token.slice(4);
