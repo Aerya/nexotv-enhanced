@@ -85,6 +85,17 @@ Si l'on ne touche pas à cette section, le comportement reste **identique à l'a
 
 ---
 
+### Authentification & configs sauvegardées
+
+- **Mot de passe webui** (optionnel) : définir `WEBUI_PASSWORD` protège la page de
+  configuration et ses endpoints (`/encrypt`, `/api/prefetch`) par un mot de passe unique
+  (session cookie signé HMAC). Non défini = UI ouverte (rétrocompatible). Les endpoints
+  addon/flux restent publics (Stremio/Nuvio ne s'authentifient pas).
+- **Configs sauvegardées côté serveur** : depuis la webui, bouton **Save** pour enregistrer la
+  config courante (nom), puis liste **Saved configurations** pour la recharger ou la supprimer.
+  Stockées dans SQLite (`data/`), chiffrées au repos si `CONFIG_SECRET` est défini. Le rechargement
+  réutilise la route `/{token}/configure`.
+
 ## Démarrage rapide (dev)
 
 ```bash

@@ -12,6 +12,7 @@
 
     <main class="main-content">
       <section class="config-section">
+        <SavedConfigs />
         <div class="card configurator-card">
           <h2>Provider</h2>
 
@@ -99,6 +100,7 @@ import { ref, provide, onMounted } from 'vue'
 import TheHeader from './components/TheHeader.vue'
 import TheOverlay from './components/TheOverlay.vue'
 import LoginGate from './components/LoginGate.vue'
+import SavedConfigs from './components/SavedConfigs.vue'
 import XtreamConfig from './components/XtreamConfig.vue'
 import IptvOrgConfig from './components/IptvOrgConfig.vue'
 import M3uConfig from './components/M3uConfig.vue'

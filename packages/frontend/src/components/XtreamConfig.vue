@@ -104,6 +104,7 @@
     </fieldset>
 
     <div class="form-actions">
+      <button type="button" class="btn ghost" @click="handleSave">Save configuration</button>
       <button type="submit" class="btn primary">
         Install Addon
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -121,6 +122,7 @@ import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAddonInfo } from '../composables/useAddonInfo'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
 import { useAuth } from '../composables/useAuth'
+import { useSavedConfigs } from '../composables/useSavedConfigs'
 import type { XtreamConfig, CatalogMode, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
@@ -408,6 +410,70 @@ async function sha256Fragment(str: string): Promise<string> {
     const hex = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
     return hex.slice(0, 10) + '…'
   } catch { return '(hash-unavailable)' }
+}
+
+/** Assemble the persistable config from the current form (no network). */
+function buildConfig(): XtreamConfig | null {
+  const baseUrl = normalizeUrl(form.xtreamUrl)
+  const username = form.xtreamUsername.trim()
+  let password = form.xtreamPassword
+  if (password === '********' && originalPassword) password = originalPassword
+  if (!validateUrl(baseUrl) || !username || !password) return null
+
+  const enableEpg = form.enableEpg
+  const customEpg = form.epgMode === 'custom' ? form.customEpgUrl.trim() : ''
+  const epgOffset = isFinite(form.epgOffsetHours) ? form.epgOffsetHours : 0
+
+  const config: XtreamConfig = {
+    provider: 'xtream',
+    xtreamUrl: baseUrl,
+    xtreamUsername: username,
+    xtreamPassword: password,
+    enableEpg,
+    reformatLogos: form.reformatLogos,
+  }
+  if (enableEpg && customEpg) config.epgUrl = customEpg
+  if (epgOffset !== 0) config.epgOffsetHours = epgOffset
+  if (form.catalogName.trim()) (config as any).catalogName = form.catalogName.trim()
+
+  const usedNames = new Set<string>()
+  if (form.catalogMode === 'custom') {
+    const groups = form.catalogGroups
+      .map(g => ({ name: g.name.trim(), categories: [...g.categories] }))
+      .filter(g => g.name && g.categories.length > 0)
+    if (groups.length > 0) {
+      config.catalogMode = 'custom'
+      config.catalogGroups = groups
+      for (const g of groups) for (const c of g.categories) usedNames.add(c)
+    }
+  } else {
+    const selected = [...form.selectedCategories]
+    if (selected.length > 0) {
+      config.selectedCategories = selected
+      config.catalogMode = form.catalogMode
+      for (const c of selected) usedNames.add(c)
+    }
+  }
+  if (usedNames.size > 0) {
+    const typeByName = new Map(categories.value.map(c => [c.name, c.type || 'tv']))
+    const categoryTypes: Record<string, 'tv' | 'movie' | 'series'> = {}
+    for (const name of usedNames) categoryTypes[name] = (typeByName.get(name) as any) || 'tv'
+    config.categoryTypes = categoryTypes
+  }
+  return config
+}
+
+async function handleSave() {
+  const config = buildConfig()
+  if (!config) { alert('Enter URL and credentials before saving.'); return }
+  const name = prompt('Name this configuration:', form.catalogName.trim() || 'Xtream')
+  if (!name) return
+  try {
+    await useSavedConfigs().save(name.trim(), config)
+    alert('Configuration saved.')
+  } catch (e: any) {
+    alert('Save failed: ' + (e.message || e))
+  }
 }
 
 async function handleSubmit() {

@@ -77,6 +77,7 @@
     </fieldset>
 
     <div class="form-actions">
+      <button type="button" class="btn ghost" @click="handleSave">Save configuration</button>
       <button type="submit" class="btn primary" id="iptv-org-submit">
         Install Addon
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -91,6 +92,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
+import { useSavedConfigs } from '../composables/useSavedConfigs'
 import type { IptvOrgConfig } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
@@ -235,6 +237,26 @@ onMounted(async () => {
     console.error('[IPTV-ORG] Failed to load countries/categories', err)
   }
 })
+
+function buildConfig(): IptvOrgConfig & { catalogName?: string } {
+  return {
+    provider: 'iptv-org',
+    iptvOrgCountry: selectedCountries.value.map(c => c.value).join(',') || null,
+    iptvOrgCategory: selectedCategories.value.map(c => c.value).join(',') || null,
+    ...(catalogName.value.trim() ? { catalogName: catalogName.value.trim() } : {}),
+  }
+}
+
+async function handleSave() {
+  const name = prompt('Name this configuration:', catalogName.value.trim() || 'IPTV-org')
+  if (!name) return
+  try {
+    await useSavedConfigs().save(name.trim(), buildConfig())
+    alert('Configuration saved.')
+  } catch (e: any) {
+    alert('Save failed: ' + (e.message || e))
+  }
+}
 
 async function handleSubmit() {
   const country = selectedCountries.value.map(c => c.value).join(',') || null

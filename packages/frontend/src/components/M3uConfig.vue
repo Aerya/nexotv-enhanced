@@ -163,6 +163,7 @@
     </fieldset>
 
     <div class="form-actions">
+      <button class="btn ghost" type="button" @click="handleSave">Save configuration</button>
       <button class="btn primary" type="button" @click="handleInstall">
         Install Addon
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -180,6 +181,7 @@ import { usePublicPlaylists } from '../composables/usePublicPlaylists'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
 import { useAuth } from '../composables/useAuth'
+import { useSavedConfigs } from '../composables/useSavedConfigs'
 import type { M3uConfig, CatalogMode, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
@@ -372,6 +374,70 @@ onMounted(() => {
     form.globalUserAgent = savedUa
   }
 })
+
+/** Assemble the persistable config from the current form (no network). */
+function buildConfig(): (M3uConfig & { catalogName?: string }) | null {
+  const m3uUrl = form.m3uUrl.trim()
+  if (!m3uUrl) return null
+  try { new URL(m3uUrl) } catch { return null }
+
+  const enableEpg = form.enableEpg
+  const customEpgUrl = form.epgMode === 'custom' ? form.customEpgUrl.trim() : ''
+  const epgOffsetHours = form.epgOffsetHours || 0
+
+  const config: M3uConfig & { catalogName?: string } = {
+    provider: 'm3u',
+    m3uUrl,
+    enableEpg,
+    reformatLogos: form.reformatLogos,
+    ...(enableEpg && epgOffsetHours !== 0 ? { epgOffsetHours } : {}),
+    ...(enableEpg && customEpgUrl ? { epgUrl: customEpgUrl } : {}),
+    ...(form.catalogName.trim() ? { catalogName: form.catalogName.trim() } : {}),
+    ...(form.globalUserAgent.trim() ? { globalUserAgent: form.globalUserAgent.trim() } : {}),
+  }
+
+  const keep = (c: string) => !knownCategoryNames.size || knownCategoryNames.has(c)
+  const usedNames = new Set<string>()
+  if (form.catalogMode === 'custom') {
+    const groups = form.catalogGroups
+      .map(g => ({ name: g.name.trim(), categories: g.categories.filter(keep) }))
+      .filter(g => g.name && g.categories.length > 0)
+    if (groups.length > 0) {
+      config.catalogMode = 'custom'
+      config.catalogGroups = groups
+      for (const g of groups) for (const c of g.categories) usedNames.add(c)
+    }
+  } else {
+    const selected = form.selectedCategories.filter(keep)
+    if (selected.length > 0) {
+      config.selectedCategories = selected
+      config.catalogMode = form.catalogMode
+      for (const c of selected) usedNames.add(c)
+    }
+  }
+  if (usedNames.size > 0) {
+    const typeByName = new Map(categories.value.map(c => [c.name, c.type]))
+    const categoryTypes: Record<string, 'tv' | 'movie' | 'series'> = {}
+    for (const name of usedNames) {
+      if (typeByName.get(name) === 'movie') categoryTypes[name] = 'movie'
+    }
+    if (Object.keys(categoryTypes).length > 0) config.categoryTypes = categoryTypes
+  }
+  return config
+}
+
+async function handleSave() {
+  const config = buildConfig()
+  if (!config) { alert('Enter a valid playlist URL before saving.'); return }
+  const name = prompt('Name this configuration:', form.catalogName.trim() || 'M3U')
+  if (!name) return
+  try {
+    await useSavedConfigs().save(name.trim(), config)
+    alert('Configuration saved.')
+  } catch (e: any) {
+    alert('Save failed: ' + (e.message || e))
+  }
+}
 
 async function handleInstall() {
   const m3uUrl = form.m3uUrl.trim()
