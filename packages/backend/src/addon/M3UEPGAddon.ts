@@ -612,7 +612,7 @@ export class M3UEPGAddon {
             episode: ep.episode,
             ...(ep.thumbnail ? { thumbnail: ep.thumbnail } : (logoUrl ? { thumbnail: logoUrl } : {})),
             ...(ep.overview ? { overview: ep.overview } : {}),
-            ...(ep.released ? { released: new Date(ep.released).toISOString() } : {}),
+            ...(ep.released ? { released: ep.released } : {}),
         }));
         return {
             id,
