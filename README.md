@@ -56,6 +56,41 @@ fonctionnalités au-dessus du code amont.
 
 ---
 
+## Captures d'écran
+
+### Configuration (webui)
+
+| | |
+|---|---|
+| ![Onglet Xtream API](screenshots/1.png) | ![Sélection des catégories](screenshots/2.png) |
+| Onglet **Xtream API** : identifiants puis *Load categories*. | Mise en page + **filtre par type** (TV / Films / Séries). |
+| ![Custom catalogs — TV](screenshots/3.png) | ![Custom catalogs — Films](screenshots/4.png) |
+| Mode **Custom catalogs** : catalogue « TV King ». | Deux catalogues « TV King » et « Films King ». |
+| ![Installation — EPG](screenshots/5.png) | ![Installation — Ready](screenshots/6.png) |
+| Overlay d'installation (pré-vol Xtream, EPG). | Manifest prêt → *Open in Stremio* / *Copy URL*. |
+
+![Onglet Multi-source](screenshots/13.png)
+
+*Onglet **Multi-source** : deux sources (King365 + Pierot), catalogues personnalisés et choix de lecture (proposer le choix / lire le 1er dispo).*
+
+### Stremio
+
+| | |
+|---|---|
+| ![Addon installé](screenshots/7.png) | ![Accueil Stremio](screenshots/8.png) |
+| Addon **NexoTV Enhanced** installé. | Catalogues TV King / Films King / Séries King. |
+| ![Fiche film + synopsis](screenshots/9.png) | ![Multi-source : choix du flux](screenshots/14.png) |
+| Fiche film avec **synopsis**, note et genres. | Un film, **deux flux** (King365 / Pierot+) — multi-source. |
+
+### Nuvio
+
+| | | |
+|---|---|---|
+| ![Accueil Nuvio](screenshots/10.png) | ![Fiche film Nuvio](screenshots/11.png) | ![Lecture Nuvio](screenshots/12.png) |
+| Accueil : TV King / Films King / Séries King. | Fiche film : *Lire*, casting. | Lecture (source NexoTV Enhanced). |
+
+---
+
 ## Fonctionnalités en détail
 
 ### Catégories & catalogues
