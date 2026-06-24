@@ -99,4 +99,50 @@ describe('createManifest', () => {
     });
     expect(m.catalogs[0].name).toBe('MyTV · Sports');
   });
+
+  it('custom mode produces one catalog per group with stable ids', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'custom',
+      catalogGroups: [
+        { name: 'Entertainment', categories: ['Movies', 'Series'] },
+        { name: 'Football', categories: ['Sports'] },
+      ],
+    });
+    expect(m.catalogs).toHaveLength(2);
+    expect(m.catalogs.map((c: any) => c.id)).toEqual(['iptv_grp_0', 'iptv_grp_1']);
+    expect(m.catalogs.map((c: any) => c.name)).toEqual(['Entertainment', 'Football']);
+  });
+
+  it('custom mode exposes a genre filter only for multi-category groups', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'custom',
+      catalogGroups: [
+        { name: 'Entertainment', categories: ['Movies', 'Series'] },
+        { name: 'Football', categories: ['Sports'] },
+      ],
+    });
+    const multi = (m.catalogs[0] as any).extra.find((e: any) => e.name === 'genre');
+    expect(multi.options).toEqual(['All Channels', 'Movies', 'Series']);
+    const single = (m.catalogs[1] as any).extra.find((e: any) => e.name === 'genre');
+    expect(single).toBeUndefined();
+  });
+
+  it('custom mode ignores groups without a name or without categories', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'custom',
+      catalogGroups: [
+        { name: '', categories: ['Movies'] },
+        { name: 'Empty', categories: [] },
+        { name: 'Valid', categories: ['Sports'] },
+      ],
+    });
+    expect(m.catalogs).toHaveLength(1);
+    expect(m.catalogs[0].name).toBe('Valid');
+  });
+
+  it('custom mode with no valid group falls back to a single catalog', () => {
+    const m = createManifest('abc123', { catalogMode: 'custom', catalogGroups: [] });
+    expect(m.catalogs).toHaveLength(1);
+    expect(m.catalogs[0].id).toBe('iptv_channels');
+  });
 });

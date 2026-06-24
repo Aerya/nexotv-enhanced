@@ -69,6 +69,7 @@
         v-if="categoriesLoaded"
         v-model="form.selectedCategories"
         v-model:mode="form.catalogMode"
+        v-model:groups="form.catalogGroups"
         :categories="categories"
         modeName="m3uCatalogMode"
       />
@@ -178,7 +179,7 @@ import { reactive, ref, inject, onMounted } from 'vue'
 import { usePublicPlaylists } from '../composables/usePublicPlaylists'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
-import type { M3uConfig, CatalogMode } from '../types/config'
+import type { M3uConfig, CatalogMode, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
 const { playlists } = usePublicPlaylists()
@@ -203,6 +204,7 @@ const form = reactive({
   globalUserAgent: '',
   selectedCategories: [] as string[],
   catalogMode: 'single' as CatalogMode,
+  catalogGroups: [] as CatalogGroup[],
 })
 
 // Category loading state
@@ -316,11 +318,20 @@ onMounted(() => {
   form.epgOffsetHours = d.epgOffsetHours ?? 0
   form.reformatLogos = !!d.reformatLogos
   form.catalogName = (decodedConfig as any).catalogName || ''
-  form.catalogMode = d.catalogMode === 'split' ? 'split' : 'single'
+  form.catalogMode = d.catalogMode === 'split' ? 'split'
+    : d.catalogMode === 'custom' ? 'custom' : 'single'
+  if (Array.isArray(d.catalogGroups) && d.catalogGroups.length) {
+    form.catalogGroups = d.catalogGroups.map(g => ({ name: g.name, categories: [...g.categories] }))
+  }
   if (Array.isArray(d.selectedCategories) && d.selectedCategories.length) {
     form.selectedCategories = [...d.selectedCategories]
-    categories.value = d.selectedCategories.map(name => ({ name }))
-    knownCategoryNames = new Set(d.selectedCategories)
+  }
+  // Seed the selector with the saved categories so it renders without a reload.
+  const seed = new Set<string>(d.selectedCategories || [])
+  for (const g of (d.catalogGroups || [])) for (const c of g.categories) seed.add(c)
+  if (seed.size) {
+    categories.value = [...seed].sort().map(name => ({ name }))
+    knownCategoryNames = new Set(seed)
     categoriesLoaded.value = true
   }
   const savedUa = d.globalUserAgent || ''
@@ -355,12 +366,21 @@ async function handleInstall() {
   }
 
   // Keep only categories still present in the playlist (when a scan was done).
-  const selected = knownCategoryNames.size
-    ? form.selectedCategories.filter(c => knownCategoryNames.has(c))
-    : form.selectedCategories
-  if (selected.length > 0) {
-    config.selectedCategories = selected
-    config.catalogMode = form.catalogMode
+  const keep = (c: string) => !knownCategoryNames.size || knownCategoryNames.has(c)
+  if (form.catalogMode === 'custom') {
+    const groups = form.catalogGroups
+      .map(g => ({ name: g.name.trim(), categories: g.categories.filter(keep) }))
+      .filter(g => g.name && g.categories.length > 0)
+    if (groups.length > 0) {
+      config.catalogMode = 'custom'
+      config.catalogGroups = groups
+    }
+  } else {
+    const selected = form.selectedCategories.filter(keep)
+    if (selected.length > 0) {
+      config.selectedCategories = selected
+      config.catalogMode = form.catalogMode
+    }
   }
 
   oc.showOverlay(false)

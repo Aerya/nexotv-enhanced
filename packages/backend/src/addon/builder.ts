@@ -15,6 +15,7 @@ async function createAddon(config: AddonConfig) {
         catalogName: config.catalogName,
         catalogMode: config.catalogMode,
         selectedCategories: config.selectedCategories,
+        catalogGroups: config.catalogGroups,
     });
     const debugFlag = !!env.DEBUG;
     if (debugFlag) {
@@ -56,11 +57,12 @@ async function createAddon(config: AddonConfig) {
                 const channels = await addonInstance.getChannelsForCatalog();
                 let items: any[] = [];
                 if (args.type === 'tv') {
-                    const splitCategory = addonInstance.getCategoryForCatalogId(args.id);
-                    if (splitCategory) {
-                        // 'split' mode: a catalog dedicated to one category.
+                    const catSet = addonInstance.getCategoriesForCatalogId(args.id);
+                    if (catSet) {
+                        // 'split'/'custom' mode: a catalog dedicated to one or more
+                        // categories (one category for split, a group for custom).
                         items = channels.filter((c: any) =>
-                            (c.category || c.attributes?.['group-title']) === splitCategory
+                            catSet.has(c.category || c.attributes?.['group-title'])
                         );
                     } else if (args.id === 'iptv_channels' || args.id === 'iptv_org') {
                         // 'single' mode (or legacy): the combined catalog, limited
