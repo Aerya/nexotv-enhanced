@@ -72,6 +72,28 @@ function selectedTypes(config: any): Set<string> {
 }
 
 /**
+ * Fetch a single movie's details (get_vod_info), lazily, for the Stremio meta
+ * handler — the streams list endpoint does not include the plot/synopsis.
+ */
+export async function fetchVodInfo(config: any, vodId: string) {
+    const { xtreamUrl, xtreamUsername, xtreamPassword } = config;
+    if (!xtreamUrl || !xtreamUsername || !xtreamPassword) return null;
+    await validatePublicUrl(xtreamUrl);
+    const base = `${xtreamUrl}/player_api.php?username=${encodeURIComponent(xtreamUsername)}&password=${encodeURIComponent(xtreamPassword)}`;
+    const data = await fetchJson(`${base}&action=get_vod_info&vod_id=${encodeURIComponent(vodId)}`, env.FETCH_TIMEOUT_MS);
+    if (!data) return null;
+    const info = data.info || data.movie_data || {};
+    return {
+        plot: info.plot || info.description || '',
+        genre: info.genre || '',
+        cast: info.cast || info.actors || '',
+        director: info.director || '',
+        releaseDate: info.releasedate || info.release_date || info.releaseDate || null,
+        rating: info.rating != null ? String(info.rating) : '',
+    };
+}
+
+/**
  * Fetch the episodes of a single series (get_series_info), lazily, for the
  * Stremio meta handler. Returns a flat episode list with stream ids/extensions.
  */

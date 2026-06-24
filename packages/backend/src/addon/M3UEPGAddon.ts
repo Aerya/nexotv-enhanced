@@ -465,11 +465,13 @@ export class M3UEPGAddon {
         const first = seriesChans[0];
         const logoUrl = first ? this.deriveFallbackLogoUrl(first) : undefined;
         const merged = new Map<string, any>();
+        let seriesPlot = '';
         for (const sc of seriesChans) {
             const src = this.sourceById(sc.source?.id);
             if (!src || src.provider !== 'xtream') continue;
             try {
-                const { episodes } = await xtreamProvider.fetchSeriesEpisodes(src, sc.srcSeriesId);
+                const { episodes, info } = await xtreamProvider.fetchSeriesEpisodes(src, sc.srcSeriesId);
+                if (!seriesPlot && info?.plot) seriesPlot = info.plot;
                 for (const ep of episodes) {
                     const k = `${ep.season}_${ep.episode}`;
                     if (!merged.has(k)) merged.set(k, ep);
@@ -493,7 +495,7 @@ export class M3UEPGAddon {
             name: first?.name || 'Series',
             ...(logoUrl ? { poster: logoUrl, logo: logoUrl, background: logoUrl } : {}),
             posterShape: 'poster',
-            description: first?.plot || '',
+            description: seriesPlot || first?.plot || '',
             ...(first?.category ? { genres: [first.category] } : {}),
             videos,
         };
@@ -775,8 +777,29 @@ export class M3UEPGAddon {
         return streams;
     }
 
+    /** Map a get_vod_info result + channel into Stremio meta fields. */
+    private movieMetaExtras(info: any, item: any) {
+        const out: any = {};
+        out.description = (info && info.plot) || item.plot || '';
+        const genres: string[] = [];
+        if (info && info.genre) for (const g of String(info.genre).split(/[,/]/)) { const t = g.trim(); if (t) genres.push(t); }
+        if (!genres.length && item.category) genres.push(item.category);
+        if (genres.length) out.genres = genres;
+        if (info && info.cast) out.cast = String(info.cast).split(',').map((s: string) => s.trim()).filter(Boolean);
+        if (info && info.director) out.director = String(info.director).split(',').map((s: string) => s.trim()).filter(Boolean);
+        if (info && info.releaseDate) { const y = String(info.releaseDate).slice(0, 4); if (/^\d{4}$/.test(y)) out.releaseInfo = y; }
+        if (info && info.rating) { const r = parseFloat(info.rating); if (!isNaN(r) && r > 0) out.imdbRating = String(r); }
+        return out;
+    }
+
     async buildMovieMeta(item: any) {
         const logoUrl = this.deriveFallbackLogoUrl(item);
+        // The streams list lacks the synopsis — fetch it lazily for Xtream movies.
+        let info: any = null;
+        const parsed = this.parseId(item.id);
+        if (parsed?.kind === 'movie') {
+            info = await xtreamProvider.fetchVodInfo(this.config, parsed.value).catch(() => null);
+        }
         return {
             id: item.id,
             type: 'movie',
@@ -785,8 +808,30 @@ export class M3UEPGAddon {
             logo: logoUrl,
             background: logoUrl,
             posterShape: 'poster',
-            description: item.plot || '',
-            ...(item.category ? { genres: [item.category] } : {}),
+            ...this.movieMetaExtras(info, item),
+        };
+    }
+
+    /** Multi-source movie meta: synopsis fetched from the first Xtream source. */
+    private async multiMovieMeta(item: any) {
+        const logoUrl = this.deriveFallbackLogoUrl(item);
+        let info: any = null;
+        for (const c of this.channels.filter(c => c.id === item.id)) {
+            const src = this.sourceById(c.source?.id);
+            if (src && src.provider === 'xtream' && c.srcVodId) {
+                info = await xtreamProvider.fetchVodInfo(src, c.srcVodId).catch(() => null);
+                if (info && info.plot) break;
+            }
+        }
+        return {
+            id: item.id,
+            type: 'movie',
+            name: item.name,
+            poster: logoUrl,
+            logo: logoUrl,
+            background: logoUrl,
+            posterShape: 'poster',
+            ...this.movieMetaExtras(info, item),
         };
     }
 
@@ -823,7 +868,8 @@ export class M3UEPGAddon {
             await this.ensureDataLoaded();
             const item = this.channelMap.get(id) || this.channels.find(c => c.id === id);
             if (!item) return null;
-            return this.simpleMeta(item, mediaTypeOf(item) === 'movie' ? 'movie' : 'tv');
+            if (mediaTypeOf(item) === 'movie') return this.multiMovieMeta(item);
+            return this.simpleMeta(item, 'tv');
         }
 
         const parsed = this.parseId(id);
