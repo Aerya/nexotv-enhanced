@@ -5,6 +5,7 @@ import dns from 'dns';
 import env from '../config/env';
 import { makeLogger } from '../utils/logger';
 import { isPrivateIp } from '../middleware/ssrf';
+import { requireAuth } from '../utils/webauth';
 
 const dnsPromises = dns.promises;
 const router = Router();
@@ -13,7 +14,7 @@ const log = makeLogger();
 const PREFETCH_MAX_BYTES = env.PREFETCH_MAX_BYTES;
 const PREFETCH_ENABLED = env.PREFETCH_ENABLED;
 
-router.post('/api/prefetch', async (req, res) => {
+router.post('/api/prefetch', requireAuth, async (req, res) => {
     if (!PREFETCH_ENABLED) return res.status(403).json({ error: 'Prefetch disabled by server' });
 
     const { url, purpose } = req.body || {};

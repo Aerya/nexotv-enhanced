@@ -50,6 +50,20 @@ export const globalIpLimiter = rateLimit({
     skip: () => !env.IP_RATE_LIMIT_ENABLED
 });
 
+// Strict limiter for the login endpoint to slow brute-force attempts.
+export const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 min
+    max: 10,
+    message: { error: 'Too many login attempts, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: false,
+    handler: (req, res, _next, options) => {
+        log.warn(`[RateLimit] Login attempts exceeded for IP: ${req.ip}`);
+        res.status(options.statusCode).send(options.message);
+    },
+});
+
 export const tokenLimiter = rateLimit({
     windowMs: env.TOKEN_RATE_LIMIT_WINDOW_MS,
     max: env.TOKEN_RATE_LIMIT_MAX,

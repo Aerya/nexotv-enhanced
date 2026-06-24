@@ -3,10 +3,36 @@ import fs from 'fs';
 import path from 'path';
 import env from '../config/env';
 import { encryptConfig } from '../utils/cryptoConfig';
+import {
+    authEnabled, verifyPassword, createSession, isAuthenticated,
+    sessionCookieHeader, requireAuth,
+} from '../utils/webauth';
+import { loginLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
-router.post('/encrypt', (req, res) => {
+// ── Auth ────────────────────────────────────────────────────────────────────
+router.get('/api/auth/status', (req, res) => {
+    res.json({ authEnabled: authEnabled(), authenticated: isAuthenticated(req) });
+});
+
+router.post('/api/login', loginLimiter, (req, res) => {
+    if (!authEnabled()) return res.json({ ok: true, authEnabled: false });
+    const { password } = req.body || {};
+    if (!verifyPassword(password)) {
+        return res.status(401).json({ error: 'Invalid password' });
+    }
+    const token = createSession();
+    res.setHeader('Set-Cookie', sessionCookieHeader(token, !!req.secure));
+    res.json({ ok: true });
+});
+
+router.post('/api/logout', (req, res) => {
+    res.setHeader('Set-Cookie', sessionCookieHeader(null, !!req.secure));
+    res.json({ ok: true });
+});
+
+router.post('/encrypt', requireAuth, (req, res) => {
     if (!env.CONFIG_SECRET) {
         return res.status(400).json({ error: 'Encryption not enabled on server (CONFIG_SECRET missing)' });
     }

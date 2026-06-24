@@ -1,4 +1,5 @@
 import type { AddonConfig } from '../types/config'
+import { useAuth } from './useAuth'
 
 function encodeConfigBase64Url(config: AddonConfig): string {
   const json = JSON.stringify(config)
@@ -15,6 +16,14 @@ export function useConfigToken(appendDetail: (line: string) => void) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       })
+      if (res.status === 401) {
+        // Session expired / gate active — surface login instead of leaking a
+        // base64 (unencrypted) token.
+        useAuth().markUnauthenticated()
+        const err: any = new Error('Session expired — please sign in again.')
+        err.auth = true
+        throw err
+      }
       if (res.ok) {
         const data = await res.json()
         token = data.token
@@ -24,6 +33,7 @@ export function useConfigToken(appendDetail: (line: string) => void) {
         token = encodeConfigBase64Url(config)
       }
     } catch (e: any) {
+      if (e?.auth) throw e // propagate auth errors so the gate shows
       appendDetail(`⚠ Encryption error (${e.message}). Falling back to Base64.`)
       token = encodeConfigBase64Url(config)
     }

@@ -30,6 +30,11 @@ const env = {
     ADDON_BACKGROUND_URL: process.env.ADDON_BACKGROUND_URL || 'https://raw.githubusercontent.com/joaosavi/nexotv/refs/heads/main/packages/frontend/public/assets/background.png',
     LOGO_CACHE_ENABLED: (process.env.LOGO_CACHE_ENABLED || 'true').toLowerCase() !== 'false',
     CONFIG_SECRET: process.env.CONFIG_SECRET || null,
+    // Optional single-password gate for the configuration web UI. When unset,
+    // the UI is open (backward compatible). The addon/stream endpoints are
+    // never gated (Stremio cannot authenticate).
+    WEBUI_PASSWORD: process.env.WEBUI_PASSWORD || null,
+    WEBUI_SESSION_TTL_MS: parseInt(process.env.WEBUI_SESSION_TTL_MS || '') || 2592000000, // 30 days
     IP_RATE_LIMIT_ENABLED: (process.env.IP_RATE_LIMIT_ENABLED || 'true').toLowerCase() !== 'false',
     IP_RATE_LIMIT_WINDOW_MS: parseInt(process.env.IP_RATE_LIMIT_WINDOW_MS || '300000', 10),
     IP_RATE_LIMIT_MAX: parseInt(process.env.IP_RATE_LIMIT_MAX || '300', 10),
