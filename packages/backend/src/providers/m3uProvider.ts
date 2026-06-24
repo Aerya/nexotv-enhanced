@@ -72,10 +72,16 @@ export async function fetchData(addonInstance: any) {
         }
         seenIds.add(id);
 
+        // Xtream-style M3U URLs mark VOD with a /movie/ path segment; expose
+        // those as playable 'movie' items. Series episodes (/series/) stay 'tv'
+        // (flat) because an M3U carries no season/episode structure.
+        const mediaType = /\/movie\//i.test(ch.url || '') ? 'movie' : 'tv';
+
         return {
             id,
             name:     ch.name,
             type:     'tv',
+            mediaType,
             url:      ch.url,
             logo:     ch.logo || '',
             category: ch.group,

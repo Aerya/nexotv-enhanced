@@ -358,7 +358,8 @@ onMounted(() => {
   const seed = new Set<string>(d.selectedCategories || [])
   for (const g of (d.catalogGroups || [])) for (const c of g.categories) seed.add(c)
   if (seed.size) {
-    categories.value = [...seed].sort().map(name => ({ name }))
+    const savedTypes = d.categoryTypes || {}
+    categories.value = [...seed].sort().map(name => ({ name, type: savedTypes[name] || 'tv' }))
     knownCategoryNames = new Set(seed)
     categoriesLoaded.value = true
   }
@@ -395,6 +396,7 @@ async function handleInstall() {
 
   // Keep only categories still present in the playlist (when a scan was done).
   const keep = (c: string) => !knownCategoryNames.size || knownCategoryNames.has(c)
+  const usedNames = new Set<string>()
   if (form.catalogMode === 'custom') {
     const groups = form.catalogGroups
       .map(g => ({ name: g.name.trim(), categories: g.categories.filter(keep) }))
@@ -402,13 +404,26 @@ async function handleInstall() {
     if (groups.length > 0) {
       config.catalogMode = 'custom'
       config.catalogGroups = groups
+      for (const g of groups) for (const c of g.categories) usedNames.add(c)
     }
   } else {
     const selected = form.selectedCategories.filter(keep)
     if (selected.length > 0) {
       config.selectedCategories = selected
       config.catalogMode = form.catalogMode
+      for (const c of selected) usedNames.add(c)
     }
+  }
+
+  // M3U parity: expose Movie categories as real 'movie' catalogs (each entry
+  // plays directly). Series stay flat under 'tv' — an M3U has no episode tree.
+  if (usedNames.size > 0) {
+    const typeByName = new Map(categories.value.map(c => [c.name, c.type]))
+    const categoryTypes: Record<string, 'tv' | 'movie' | 'series'> = {}
+    for (const name of usedNames) {
+      if (typeByName.get(name) === 'movie') categoryTypes[name] = 'movie'
+    }
+    if (Object.keys(categoryTypes).length > 0) config.categoryTypes = categoryTypes
   }
 
   oc.showOverlay(false)
