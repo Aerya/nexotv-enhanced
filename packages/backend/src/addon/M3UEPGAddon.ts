@@ -48,11 +48,20 @@ export interface AddonConfig {
     catalogMode?: 'single' | 'split' | 'custom';
     /** User-defined catalogs, each grouping one or more categories. */
     catalogGroups?: Array<{ name: string; categories: string[] }>;
+    /** Category name → media type ('tv' | 'movie' | 'series'). Drives VOD/series. */
+    categoryTypes?: Record<string, 'tv' | 'movie' | 'series'>;
 }
+
+export type MediaType = 'tv' | 'movie' | 'series';
 
 /** Read a channel's category, regardless of provider shape. */
 function channelCategory(item: any): string | undefined {
     return item?.category || item?.attributes?.['group-title'];
+}
+
+/** Media type of an item (live channels have none → 'tv'). */
+function mediaTypeOf(item: any): MediaType {
+    return (item?.mediaType as MediaType) || 'tv';
 }
 
 function stableStringify(obj: any) {
@@ -77,10 +86,18 @@ function normalizeSelection(config: AddonConfig) {
                 .filter(Boolean))].sort(),
         }))
         .filter(g => g.name && g.categories.length > 0);
+    // Keep only the types of categories actually in play, sorted for stability.
+    const inPlay = new Set<string>([...cats, ...groups.flatMap(g => g.categories)]);
+    const types: Record<string, string> = {};
+    const srcTypes = config.categoryTypes || {};
+    for (const name of [...inPlay].sort()) {
+        if (srcTypes[name]) types[name] = srcTypes[name];
+    }
     return {
         catalogMode: mode,
         selectedCategories: [...new Set(cats)].sort(),
         catalogGroups: groups,
+        categoryTypes: types,
     };
 }
 
@@ -256,48 +273,90 @@ export class M3UEPGAddon {
         );
     }
 
-    /** Keep only channels whose category was selected (no selection = keep all). */
-    filterBySelectedCategories(items: any[]): any[] {
-        const selected = this.selectedCategorySet();
-        if (selected.size === 0) return items;
-        return items.filter(i => {
-            const cat = channelCategory(i);
-            return cat ? selected.has(cat.trim()) : false;
-        });
+    /** Media type configured for a category name (default 'tv'). */
+    categoryType(name: string): MediaType {
+        return (this.config.categoryTypes?.[name?.trim()] as MediaType) || 'tv';
+    }
+
+    /** Dominant media type among a list of category names. */
+    private groupType(categories: string[]): MediaType {
+        const tally: Record<MediaType, number> = { tv: 0, movie: 0, series: 0 };
+        for (const c of categories) tally[this.categoryType(c)]++;
+        if (tally.series >= tally.movie && tally.series > tally.tv) return 'series';
+        if (tally.movie >= tally.series && tally.movie > tally.tv) return 'movie';
+        return 'tv';
     }
 
     /**
-     * Map a per-catalog id back to the set of categories it should contain.
-     * - 'split' : `iptv_cat_<n>` → the Nth selected category
-     * - 'custom': `iptv_grp_<n>` → the Nth group's categories
-     * Returns null for the combined catalog (single/legacy), handled separately.
+     * Resolve a catalog id to the media type + category set it should contain.
+     * Returns null when the id is not one of ours.
+     *   single : iptv_channels (tv) / iptv_movies (movie) / iptv_series (series)
+     *   split  : iptv_cat_<n>  → Nth selected category (type from categoryTypes)
+     *   custom : iptv_grp_<n>  → Nth group (dominant type)
      */
-    getCategoriesForCatalogId(id: string): Set<string> | null {
+    resolveCatalog(id: string): { cats: Set<string> | null; type: MediaType } | null {
         const mode = this.config.catalogMode;
+        const selected = (this.config.selectedCategories || [])
+            .map(c => (typeof c === 'string' ? c.trim() : '')).filter(Boolean);
+
         if (mode === 'split' && id.startsWith('iptv_cat_')) {
             const idx = parseInt(id.slice('iptv_cat_'.length), 10);
-            if (!Number.isInteger(idx)) return null;
-            const cats = (this.config.selectedCategories || [])
-                .map(c => (typeof c === 'string' ? c.trim() : ''))
-                .filter(Boolean);
-            const cat = cats[idx];
-            return cat ? new Set([cat]) : null;
+            const cat = Number.isInteger(idx) ? selected[idx] : undefined;
+            return cat ? { cats: new Set([cat]), type: this.categoryType(cat) } : null;
         }
         if (mode === 'custom' && id.startsWith('iptv_grp_')) {
             const idx = parseInt(id.slice('iptv_grp_'.length), 10);
-            if (!Number.isInteger(idx)) return null;
             const groups = (this.config.catalogGroups || [])
                 .map(g => ({
                     name: (g?.name || '').trim(),
-                    categories: (g?.categories || [])
-                        .map(c => (typeof c === 'string' ? c.trim() : ''))
-                        .filter(Boolean),
+                    categories: (g?.categories || []).map(c => (typeof c === 'string' ? c.trim() : '')).filter(Boolean),
                 }))
                 .filter(g => g.name && g.categories.length > 0);
-            const group = groups[idx];
-            return group ? new Set(group.categories) : null;
+            const group = Number.isInteger(idx) ? groups[idx] : undefined;
+            return group ? { cats: new Set(group.categories), type: this.groupType(group.categories) } : null;
+        }
+        // single / legacy combined catalogs
+        if (id === 'iptv_channels' || id === 'iptv_org') {
+            const tvCats = selected.filter(c => this.categoryType(c) === 'tv');
+            return { cats: tvCats.length ? new Set(tvCats) : null, type: 'tv' };
+        }
+        if (id === 'iptv_movies') {
+            const cats = selected.filter(c => this.categoryType(c) === 'movie');
+            return { cats: cats.length ? new Set(cats) : null, type: 'movie' };
+        }
+        if (id === 'iptv_series') {
+            const cats = selected.filter(c => this.categoryType(c) === 'series');
+            return { cats: cats.length ? new Set(cats) : null, type: 'series' };
         }
         return null;
+    }
+
+    /** Channels belonging to a given catalog id (type + category filtered). */
+    itemsForCatalog(id: string): any[] {
+        const spec = this.resolveCatalog(id);
+        if (!spec) return [];
+        return this.channels.filter(c => {
+            if (mediaTypeOf(c) !== spec.type) return false;
+            if (!spec.cats) return true;
+            const cat = channelCategory(c);
+            return cat ? spec.cats.has(cat.trim()) : false;
+        });
+    }
+
+    /** Parse one of our ids into its kind and payload. */
+    parseId(id: string): { kind: MediaType | 'episode'; value: string; ext?: string } | null {
+        const prefix = `xc${this.idPrefix}_`;
+        if (!id.startsWith(prefix)) return null;
+        const rest = id.slice(prefix.length);
+        if (rest.startsWith('v_')) return { kind: 'movie', value: rest.slice(2) };
+        if (rest.startsWith('s_')) return { kind: 'series', value: rest.slice(2) };
+        if (rest.startsWith('e_')) {
+            const r = rest.slice(2);
+            const u = r.lastIndexOf('_');
+            return u > 0 ? { kind: 'episode', value: r.slice(0, u), ext: r.slice(u + 1) }
+                : { kind: 'episode', value: r };
+        }
+        return { kind: 'tv', value: rest };
     }
 
     buildGenresInManifest() {
@@ -309,6 +368,8 @@ export class M3UEPGAddon {
             const groups = [
                 ...new Set(
                     this.channels
+                        // Only live-TV items feed the TV catalog's genre filter.
+                        .filter(c => mediaTypeOf(c) === 'tv')
                         .map(c => c.category || c.attributes?.['group-title'])
                         .filter(Boolean)
                         .map((s: string) => s.trim())
@@ -445,6 +506,20 @@ export class M3UEPGAddon {
 
     generateMetaPreview(item: any) {
         const logoUrl = this.deriveFallbackLogoUrl(item);
+        const mt = mediaTypeOf(item);
+        if (mt === 'movie' || mt === 'series') {
+            return {
+                id: item.id,
+                type: mt,
+                name: item.name,
+                poster: logoUrl,
+                logo: logoUrl,
+                background: logoUrl,
+                posterShape: 'poster',
+                description: item.plot || '',
+                ...(item.category ? { genres: [item.category] } : {}),
+            };
+        }
         return {
             id: item.id,
             type: 'tv',
@@ -463,9 +538,24 @@ export class M3UEPGAddon {
     }
 
     async getStreams(id: string) {
+        // Series episodes are not stored as channels — resolve them directly.
+        const parsed = this.parseId(id);
+        if (parsed?.kind === 'episode') {
+            const { xtreamUrl, xtreamUsername, xtreamPassword } = this.config;
+            if (!xtreamUrl || !xtreamUsername || !xtreamPassword) return [];
+            const ext = parsed.ext || 'mp4';
+            const url = `${xtreamUrl}/series/${xtreamUsername}/${xtreamPassword}/${parsed.value}.${ext}`;
+            return [{ url, title: 'Play', behaviorHints: { notWebReady: true } }];
+        }
+
         await this.ensureDataLoaded();
         const item = this.channelMap.get(id);
         if (!item) return [];
+
+        // Movies: a single direct file stream (no live HLS variant).
+        if (mediaTypeOf(item) === 'movie') {
+            return [{ url: item.url, title: item.name, behaviorHints: { notWebReady: true } }];
+        }
 
         const reqHeaders: Record<string, string> = {};
         if (item.userAgent) reqHeaders['User-Agent'] = item.userAgent;
@@ -496,8 +586,59 @@ export class M3UEPGAddon {
         return streams;
     }
 
+    async buildMovieMeta(item: any) {
+        const logoUrl = this.deriveFallbackLogoUrl(item);
+        return {
+            id: item.id,
+            type: 'movie',
+            name: item.name,
+            poster: logoUrl,
+            logo: logoUrl,
+            background: logoUrl,
+            posterShape: 'poster',
+            description: item.plot || '',
+            ...(item.category ? { genres: [item.category] } : {}),
+        };
+    }
+
+    async buildSeriesMeta(id: string, seriesId: string) {
+        const item = this.channelMap.get(id);
+        const logoUrl = item ? this.deriveFallbackLogoUrl(item) : undefined;
+        const { episodes, info } = await xtreamProvider.fetchSeriesEpisodes(this.config, seriesId);
+        const videos = episodes.map((ep: any) => ({
+            id: `xc${this.idPrefix}_e_${ep.id}_${ep.ext}`,
+            title: ep.title,
+            season: ep.season,
+            episode: ep.episode,
+            ...(ep.thumbnail ? { thumbnail: ep.thumbnail } : (logoUrl ? { thumbnail: logoUrl } : {})),
+            ...(ep.overview ? { overview: ep.overview } : {}),
+            ...(ep.released ? { released: new Date(ep.released).toISOString() } : {}),
+        }));
+        return {
+            id,
+            type: 'series',
+            name: item?.name || info?.name || 'Series',
+            ...(logoUrl ? { poster: logoUrl, logo: logoUrl, background: logoUrl } : {}),
+            posterShape: 'poster',
+            description: info?.plot || item?.plot || '',
+            ...(item?.category ? { genres: [item.category] } : {}),
+            videos,
+        };
+    }
+
     async getDetailedMeta(id: string) {
+        const parsed = this.parseId(id);
+        if (parsed?.kind === 'series') {
+            await this.ensureDataLoaded();
+            return this.buildSeriesMeta(id, parsed.value);
+        }
+
         await this.ensureDataLoaded();
+        const movieItem = this.channelMap.get(id);
+        if (movieItem && mediaTypeOf(movieItem) === 'movie') {
+            return this.buildMovieMeta(movieItem);
+        }
+
         await this.ensureEpgLoaded();
         const item = this.channelMap.get(id);
         if (!item) return null;

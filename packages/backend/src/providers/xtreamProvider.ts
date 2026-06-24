@@ -12,6 +12,82 @@ async function withTimeout(url: string, options: any, ms: number) {
     }
 }
 
+async function fetchJson(url: string, ms: number): Promise<any> {
+    const resp = await withTimeout(url, {}, ms).catch(() => null);
+    if (!resp || !resp.ok) return null;
+    try { return await resp.json(); } catch { return null; }
+}
+
+/** Build a category_id → category_name map from a get_*_categories response. */
+function categoryIdMap(arr: any): Record<string, string> {
+    const map: Record<string, string> = {};
+    if (Array.isArray(arr)) {
+        for (const c of arr) {
+            if (c && c.category_id != null && c.category_name) {
+                map[String(c.category_id)] = String(c.category_name);
+            }
+        }
+    }
+    return map;
+}
+
+/** All category names the user selected (single/split + custom groups). */
+function selectedCategoryNames(config: any): Set<string> {
+    const out = new Set<string>();
+    for (const c of config.selectedCategories || []) {
+        if (typeof c === 'string' && c.trim()) out.add(c.trim());
+    }
+    for (const g of config.catalogGroups || []) {
+        for (const c of g?.categories || []) {
+            if (typeof c === 'string' && c.trim()) out.add(c.trim());
+        }
+    }
+    return out;
+}
+
+/** Which media types the selection covers, per config.categoryTypes. */
+function selectedTypes(config: any): Set<string> {
+    const names = selectedCategoryNames(config);
+    const types: Record<string, string> = config.categoryTypes || {};
+    const out = new Set<string>();
+    for (const n of names) out.add(types[n] || 'tv');
+    return out;
+}
+
+/**
+ * Fetch the episodes of a single series (get_series_info), lazily, for the
+ * Stremio meta handler. Returns a flat episode list with stream ids/extensions.
+ */
+export async function fetchSeriesEpisodes(config: any, seriesId: string) {
+    const { xtreamUrl, xtreamUsername, xtreamPassword } = config;
+    if (!xtreamUrl || !xtreamUsername || !xtreamPassword) return { episodes: [], info: null };
+    await validatePublicUrl(xtreamUrl);
+    const base = `${xtreamUrl}/player_api.php?username=${encodeURIComponent(xtreamUsername)}&password=${encodeURIComponent(xtreamPassword)}`;
+    const data = await fetchJson(`${base}&action=get_series_info&series_id=${encodeURIComponent(seriesId)}`, env.FETCH_TIMEOUT_MS);
+    if (!data) return { episodes: [], info: null };
+
+    const epsObj = data.episodes || {};
+    const episodes: any[] = [];
+    for (const seasonKey of Object.keys(epsObj)) {
+        const arr = epsObj[seasonKey];
+        if (!Array.isArray(arr)) continue;
+        for (const ep of arr) {
+            if (!ep || ep.id == null) continue;
+            episodes.push({
+                id: String(ep.id),
+                season: Number(seasonKey) || Number(ep.season) || 1,
+                episode: Number(ep.episode_num) || 0,
+                title: ep.title || `Episode ${ep.episode_num || ''}`.trim(),
+                ext: (ep.container_extension || 'mp4').toString(),
+                thumbnail: ep.info?.movie_image || ep.info?.cover_big || null,
+                overview: ep.info?.plot || ep.info?.overview || '',
+                released: ep.info?.releasedate || ep.added || null,
+            });
+        }
+    }
+    return { episodes, info: data.info || null };
+}
+
 export async function fetchData(addonInstance: any) {
     const { config } = addonInstance;
     const {
@@ -67,6 +143,7 @@ export async function fetchData(addonInstance: any) {
             id: `xc${addonInstance.idPrefix}_${s.stream_id}`,
             name: s.name,
             type: 'tv',
+            mediaType: 'tv',
             url: `${xtreamUrl}/live/${xtreamUsername}/${xtreamPassword}/${s.stream_id}.m3u8`,
             logo: s.stream_icon,
             category: cat,
@@ -78,6 +155,65 @@ export async function fetchData(addonInstance: any) {
             }
         };
     });
+
+    // VOD (movies) and series are only fetched when the user actually selected
+    // categories of that type — keeps the dataset small and avoids useless calls.
+    const wantTypes = selectedTypes(config);
+    const selectedNames = selectedCategoryNames(config);
+
+    if (wantTypes.has('movie')) {
+        const [vodCatsRaw, vodRaw] = await Promise.all([
+            fetchJson(`${base}&action=get_vod_categories`, env.FETCH_TIMEOUT_MS),
+            fetchJson(`${base}&action=get_vod_streams`, env.FETCH_TIMEOUT_MS),
+        ]);
+        const vodCatMap = categoryIdMap(vodCatsRaw);
+        let added = 0;
+        for (const v of Array.isArray(vodRaw) ? vodRaw : []) {
+            const cat = vodCatMap[String(v.category_id)] || v.category_name || '';
+            if (!cat || !selectedNames.has(cat.trim())) continue;
+            const ext = (v.container_extension || 'mp4').toString();
+            addonInstance.channels.push({
+                id: `xc${addonInstance.idPrefix}_v_${v.stream_id}`,
+                name: v.name,
+                type: 'movie',
+                mediaType: 'movie',
+                url: `${xtreamUrl}/movie/${xtreamUsername}/${xtreamPassword}/${v.stream_id}.${ext}`,
+                logo: v.stream_icon || v.cover,
+                category: cat,
+                plot: v.plot || '',
+                attributes: { 'tvg-logo': v.stream_icon || v.cover, 'group-title': cat }
+            });
+            added++;
+        }
+        addonInstance.log?.debug('Xtream VOD added', { count: added });
+    }
+
+    if (wantTypes.has('series')) {
+        const [serCatsRaw, serRaw] = await Promise.all([
+            fetchJson(`${base}&action=get_series_categories`, env.FETCH_TIMEOUT_MS),
+            fetchJson(`${base}&action=get_series`, env.FETCH_TIMEOUT_MS),
+        ]);
+        const serCatMap = categoryIdMap(serCatsRaw);
+        let added = 0;
+        for (const s of Array.isArray(serRaw) ? serRaw : []) {
+            const cat = serCatMap[String(s.category_id)] || s.category_name || '';
+            if (!cat || !selectedNames.has(cat.trim())) continue;
+            addonInstance.channels.push({
+                id: `xc${addonInstance.idPrefix}_s_${s.series_id}`,
+                name: s.name,
+                type: 'series',
+                mediaType: 'series',
+                seriesId: String(s.series_id),
+                logo: s.cover,
+                category: cat,
+                plot: s.plot || '',
+                genre: s.genre || '',
+                attributes: { 'tvg-logo': s.cover, 'group-title': cat }
+            });
+            added++;
+        }
+        addonInstance.log?.debug('Xtream series added', { count: added });
+    }
 
     if (config.enableEpg) {
         const customEpgUrl = config.epgUrl && typeof config.epgUrl === 'string' && config.epgUrl.trim() ? config.epgUrl.trim() : null;

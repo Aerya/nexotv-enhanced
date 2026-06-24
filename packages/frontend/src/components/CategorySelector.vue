@@ -40,8 +40,8 @@
       </button>
     </div>
     <small v-if="hasTypes" class="hint">
-      Movie / Series labels are informational. Catalogs currently include <strong>live TV</strong>
-      channels only.
+      Type is auto-detected. Movie and Series catalogs play directly from your provider
+      (series show seasons &amp; episodes on Xtream).
     </small>
 
     <!-- single / split: simple category picker -->

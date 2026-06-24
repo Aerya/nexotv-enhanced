@@ -145,4 +145,48 @@ describe('createManifest', () => {
     expect(m.catalogs).toHaveLength(1);
     expect(m.catalogs[0].id).toBe('iptv_channels');
   });
+
+  it('single mode splits selected categories into one catalog per media type', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'single',
+      selectedCategories: ['News', 'Action', 'Drama'],
+      categoryTypes: { News: 'tv', Action: 'movie', Drama: 'series' },
+    });
+    const byId = Object.fromEntries(m.catalogs.map((c: any) => [c.id, c]));
+    expect(byId['iptv_channels'].type).toBe('tv');
+    expect(byId['iptv_movies'].type).toBe('movie');
+    expect(byId['iptv_series'].type).toBe('series');
+    expect(m.types).toEqual(expect.arrayContaining(['tv', 'movie', 'series']));
+  });
+
+  it('split mode types each catalog from its category type', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'split',
+      selectedCategories: ['News', 'Action'],
+      categoryTypes: { News: 'tv', Action: 'movie' },
+    });
+    expect(m.catalogs.map((c: any) => c.type)).toEqual(['tv', 'movie']);
+  });
+
+  it('custom mode types each catalog from its group dominant type', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'custom',
+      catalogGroups: [{ name: 'Cinéma', categories: ['Action', 'Comedy'] }],
+      categoryTypes: { Action: 'movie', Comedy: 'movie' },
+    });
+    expect(m.catalogs[0].type).toBe('movie');
+  });
+
+  it('types is just [tv] when only TV categories are selected', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'single',
+      selectedCategories: ['News'],
+      categoryTypes: { News: 'tv' },
+    });
+    expect(m.types).toEqual(['tv']);
+  });
+
+  it('uses the enhanced addon id', () => {
+    expect(createManifest().id).toBe('community.nexotv.enhanced');
+  });
 });
