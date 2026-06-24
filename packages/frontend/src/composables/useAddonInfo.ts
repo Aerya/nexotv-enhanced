@@ -12,13 +12,13 @@ export function useAddonInfo() {
         fetch('/api/capabilities').then(r => r.json()).catch(() => ({ encryptionEnabled: false }))
       ])
       info.value = {
-        name: infoData.name || 'NexoTV Enhanced',
+        name: infoData.name || 'NexoTV-Enhanced',
         description: infoData.description || '',
         logoUrl: infoData.logoUrl || '',
         encryptionEnabled: capsData.encryptionEnabled ?? false
       }
     } catch {
-      info.value = { name: 'NexoTV Enhanced', description: '', logoUrl: '', encryptionEnabled: false }
+      info.value = { name: 'NexoTV-Enhanced', description: '', logoUrl: '', encryptionEnabled: false }
     } finally {
       loading.value = false
     }

@@ -124,7 +124,7 @@ import type { XtreamConfig, CatalogMode, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
 const { info: addonInfo } = useAddonInfo()
-const addonName = addonInfo.value?.name ?? 'NexoTV Enhanced'
+const addonName = addonInfo.value?.name ?? 'NexoTV-Enhanced'
 
 const showPwd = ref(false)
 let originalPassword = ''
