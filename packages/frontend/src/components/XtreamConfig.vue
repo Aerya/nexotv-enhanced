@@ -215,14 +215,14 @@ async function fetchLiveList(): Promise<any[]> {
   return list
 }
 
-async function fetchLiveCategories(): Promise<any[]> {
+async function fetchCategories(action: string, label: string): Promise<any[]> {
   const base = apiBase()
   let txt: string
   try {
-    txt = await robustFetch(`${base}&action=get_live_categories`, 'live_categories', true)
+    txt = await robustFetch(`${base}&action=${action}`, label, true)
   } catch {
     try {
-      txt = await robustFetch(`${base}&action=get_live_categories`, 'live_categories', false)
+      txt = await robustFetch(`${base}&action=${action}`, label, false)
     } catch {
       return []
     }
@@ -235,15 +235,24 @@ async function fetchLiveCategories(): Promise<any[]> {
   }
 }
 
+function declaredNames(cats: any[]): string[] {
+  return cats
+    .map(c => (c && c.category_name ? String(c.category_name).trim() : ''))
+    .filter(Boolean)
+}
+
 /**
- * Build the category list. Category *names* come from get_live_categories
- * (live streams only carry category_id), and channel counts are derived by
- * mapping each stream's category_id back to its name. Falls back to any
- * category_name/category present on the streams when the panel omits them.
+ * Build the typed category list. Live category *names* come from
+ * get_live_categories (live streams only carry category_id) and channel counts
+ * are derived by mapping each stream's category_id to its name. VOD and series
+ * categories are added with a type label only (informational — catalogs still
+ * contain live TV).
  */
-function buildCategoryEntries(cats: any[], live: any[]): CategoryEntry[] {
+function buildCategoryEntries(
+  liveCats: any[], vodCats: any[], seriesCats: any[], live: any[]
+): CategoryEntry[] {
   const idToName = new Map<string, string>()
-  for (const c of cats) {
+  for (const c of liveCats) {
     if (c && c.category_id != null && c.category_name) {
       idToName.set(String(c.category_id), String(c.category_name).trim())
     }
@@ -259,12 +268,17 @@ function buildCategoryEntries(cats: any[], live: any[]): CategoryEntry[] {
     if (!name) continue
     counts.set(name, (counts.get(name) || 0) + 1)
   }
-  // Union of declared categories and any category actually seen on a stream.
-  const names = new Set<string>([...idToName.values(), ...counts.keys()])
-  return [...names]
-    .filter(Boolean)
-    .map(name => ({ name, count: counts.get(name) || 0 }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+
+  const tvNames = new Set<string>([...idToName.values(), ...counts.keys()].filter(Boolean))
+  const order: Record<string, number> = { tv: 0, movie: 1, series: 2 }
+  const entries: CategoryEntry[] = []
+  for (const name of tvNames) entries.push({ name, count: counts.get(name) || 0, type: 'tv' })
+  for (const name of new Set(declaredNames(vodCats))) entries.push({ name, type: 'movie' })
+  for (const name of new Set(declaredNames(seriesCats))) entries.push({ name, type: 'series' })
+
+  return entries.sort((a, b) =>
+    order[a.type!] - order[b.type!] || a.name.localeCompare(b.name)
+  )
 }
 
 /** Fetch + cache categories and the live list for the current credentials. */
@@ -272,8 +286,13 @@ async function loadCategoryEntries(): Promise<{ entries: CategoryEntry[]; live: 
   if (cachedCategoryEntries && cachedLiveList && cachedLiveKey === credsKey()) {
     return { entries: cachedCategoryEntries, live: cachedLiveList }
   }
-  const [cats, live] = await Promise.all([fetchLiveCategories(), fetchLiveList()])
-  const entries = buildCategoryEntries(cats, live)
+  const [liveCats, vodCats, seriesCats, live] = await Promise.all([
+    fetchCategories('get_live_categories', 'live_categories'),
+    fetchCategories('get_vod_categories', 'vod_categories'),
+    fetchCategories('get_series_categories', 'series_categories'),
+    fetchLiveList(),
+  ])
+  const entries = buildCategoryEntries(liveCats, vodCats, seriesCats, live)
   cachedCategoryEntries = entries
   cachedLiveList = live
   cachedLiveKey = credsKey()
@@ -297,7 +316,10 @@ async function loadCategories() {
     if (entries.length === 0) throw new Error('No categories found in this panel.')
     categories.value = entries
     categoriesLoaded.value = true
-    oc.appendDetail(`✔ ${entries.length} categories across ${live.length} channels`)
+    const nTv = entries.filter(e => e.type === 'tv').length
+    const nMovie = entries.filter(e => e.type === 'movie').length
+    const nSeries = entries.filter(e => e.type === 'series').length
+    oc.appendDetail(`✔ ${entries.length} categories (${nTv} TV, ${nMovie} Movies, ${nSeries} Series) · ${live.length} channels`)
     oc.setProgress(100, 'Categories loaded')
     oc.hideOverlay()
   } catch (e: any) {

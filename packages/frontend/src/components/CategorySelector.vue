@@ -31,6 +31,19 @@
       </div>
     </div>
 
+    <!-- Type filter (only when the source exposes more than live TV) -->
+    <div v-if="hasTypes" class="type-filter">
+      <button v-for="t in typeFilters" :key="t.value" type="button"
+        class="playlist-chip" :class="{ active: typeFilter === t.value }"
+        @click="typeFilter = t.value">
+        <span class="chip-label">{{ t.label }}<span v-if="t.value !== 'all'" class="chip-n"> ({{ countByType(t.value) }})</span></span>
+      </button>
+    </div>
+    <small v-if="hasTypes" class="hint">
+      Movie / Series labels are informational. Catalogs currently include <strong>live TV</strong>
+      channels only.
+    </small>
+
     <!-- single / split: simple category picker -->
     <template v-if="mode !== 'custom'">
       <div class="cat-toolbar">
@@ -45,12 +58,14 @@
       </div>
 
       <div class="cat-list">
-        <label v-for="cat in filtered" :key="cat.name" class="cat-item" :class="{ checked: selectedSet.has(cat.name) }">
+        <label v-for="cat in filtered" :key="cat.type + '::' + cat.name" class="cat-item"
+          :class="{ checked: selectedSet.has(cat.name) }">
           <input type="checkbox" :checked="selectedSet.has(cat.name)" @change="toggle(cat.name)">
+          <span v-if="cat.type" class="type-badge" :class="'t-' + cat.type">{{ typeLabel(cat.type) }}</span>
           <span class="cat-name" :title="cat.name">{{ cat.name }}</span>
           <span v-if="cat.count != null" class="cat-badge">{{ cat.count }}</span>
         </label>
-        <p v-if="filtered.length === 0" class="cat-empty">No category matches “{{ filter }}”.</p>
+        <p v-if="filtered.length === 0" class="cat-empty">No category matches the current filter.</p>
       </div>
 
       <small v-if="mode === 'split' && selectedSet.size > splitWarnThreshold" class="hint warn">
@@ -80,9 +95,10 @@
             <input type="text" class="cat-filter" v-model="groupFilters[gi]" placeholder="Filter categories…"
               autocomplete="off">
             <div class="cat-list">
-              <label v-for="cat in filteredForGroup(gi)" :key="cat.name" class="cat-item"
+              <label v-for="cat in filteredForGroup(gi)" :key="cat.type + '::' + cat.name" class="cat-item"
                 :class="{ checked: groupHas(gi, cat.name) }">
                 <input type="checkbox" :checked="groupHas(gi, cat.name)" @change="toggleGroupCategory(gi, cat.name)">
+                <span v-if="cat.type" class="type-badge" :class="'t-' + cat.type">{{ typeLabel(cat.type) }}</span>
                 <span class="cat-name" :title="cat.name">{{ cat.name }}</span>
                 <span v-if="cat.count != null" class="cat-badge">{{ cat.count }}</span>
               </label>
@@ -107,9 +123,12 @@
 import { computed, reactive, ref } from 'vue'
 import type { CatalogMode, CatalogGroup } from '../types/config'
 
+export type CategoryType = 'tv' | 'movie' | 'series'
+
 export interface CategoryEntry {
   name: string
   count?: number
+  type?: CategoryType
 }
 
 const props = defineProps<{
@@ -129,14 +148,37 @@ const emit = defineEmits<{
 
 const splitWarnThreshold = 25
 const filter = ref('')
+const typeFilter = ref<'all' | CategoryType>('all')
+
+const typeFilters = [
+  { value: 'all' as const, label: 'All' },
+  { value: 'tv' as const, label: 'TV' },
+  { value: 'movie' as const, label: 'Movies' },
+  { value: 'series' as const, label: 'Series' },
+]
 
 const modeName = computed(() => props.modeName || 'catalogMode')
 const selectedSet = computed(() => new Set(props.modelValue))
+const hasTypes = computed(() => props.categories.some(c => c.type && c.type !== 'tv'))
+
+function typeLabel(t?: CategoryType) {
+  return t === 'movie' ? 'Movie' : t === 'series' ? 'Series' : 'TV'
+}
+
+function countByType(t: 'all' | CategoryType) {
+  if (t === 'all') return props.categories.length
+  return props.categories.filter(c => (c.type || 'tv') === t).length
+}
+
+function matchesType(cat: CategoryEntry) {
+  return typeFilter.value === 'all' || (cat.type || 'tv') === typeFilter.value
+}
 
 const filtered = computed(() => {
   const q = filter.value.trim().toLowerCase()
-  if (!q) return props.categories
-  return props.categories.filter(c => c.name.toLowerCase().includes(q))
+  return props.categories.filter(c =>
+    matchesType(c) && (!q || c.name.toLowerCase().includes(q))
+  )
 })
 
 function toggle(name: string) {
@@ -153,9 +195,10 @@ function selectAll() {
 }
 
 function selectNone() {
-  if (filter.value.trim()) {
-    const filteredNames = new Set(filtered.value.map(c => c.name))
-    emit('update:modelValue', props.modelValue.filter(n => !filteredNames.has(n)))
+  const visible = new Set(filtered.value.map(c => c.name))
+  if (visible.size < props.categories.length) {
+    // A filter is active → only clear the visible subset.
+    emit('update:modelValue', props.modelValue.filter(n => !visible.has(n)))
   } else {
     emit('update:modelValue', [])
   }
@@ -228,14 +271,24 @@ function toggleGroupCategory(gi: number, name: string) {
 
 function filteredForGroup(gi: number) {
   const q = (groupFilters[gi] || '').trim().toLowerCase()
-  if (!q) return props.categories
-  return props.categories.filter(c => c.name.toLowerCase().includes(q))
+  return props.categories.filter(c =>
+    matchesType(c) && (!q || c.name.toLowerCase().includes(q))
+  )
 }
 </script>
 
 <style scoped>
 .category-selector {
   margin-top: 0.5rem;
+}
+.type-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+.chip-n {
+  opacity: 0.6;
 }
 .cat-toolbar {
   display: flex;
@@ -298,6 +351,27 @@ function filteredForGroup(gi: number) {
   border-radius: 10px;
   padding: 0.05rem 0.5rem;
   flex-shrink: 0;
+}
+.type-badge {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: 5px;
+  padding: 0.05rem 0.4rem;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.type-badge.t-tv {
+  background: rgba(56, 189, 248, 0.18);
+  color: #7dd3fc;
+}
+.type-badge.t-movie {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fbbf24;
+}
+.type-badge.t-series {
+  background: rgba(167, 139, 250, 0.2);
+  color: #c4b5fd;
 }
 .cat-empty {
   padding: 0.75rem;

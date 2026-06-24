@@ -28,6 +28,10 @@ disponibles que comme un filtre « genre » à l'intérieur de ce catalogue.
 
 Cette version ajoute, **directement dans la page de configuration web**, la possibilité de :
 
+0. **Étiqueter les catégories par type** — la webui indique pour chaque catégorie si c'est de la
+   **TV**, des **Films** ou des **Séries** (Xtream : via `get_live/vod/series_categories` ; M3U :
+   d'après le chemin des URLs `/live/` `/movie/` `/series/`), avec un filtre par type. C'est
+   **informatif** : les catalogues générés contiennent pour l'instant uniquement les chaînes **TV live**.
 1. **Charger les catégories** d'un flux IPTV (Xtream ou M3U) et les afficher avec le nombre de chaînes.
 2. **Cocher les catégories** que l'on souhaite garder (filtre, tout sélectionner / désélectionner / inverser).
 3. **Choisir la mise en page des catalogues Stremio** :

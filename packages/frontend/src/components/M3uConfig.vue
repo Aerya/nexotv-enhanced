@@ -248,20 +248,48 @@ async function fetchPlaylistText(url: string): Promise<string> {
   return payload.content
 }
 
-// Lightweight client-side group-title extraction (mirrors the backend M3U parser).
+type CategoryType = 'tv' | 'movie' | 'series'
+
+// Classify a stream URL by its Xtream-style path marker.
+function typeFromUrl(url: string): CategoryType {
+  const u = url.toLowerCase()
+  if (u.includes('/series/')) return 'series'
+  if (u.includes('/movie/')) return 'movie'
+  return 'tv'
+}
+
+interface GroupTally { count: number; tv: number; movie: number; series: number }
+
+function dominantType(t: GroupTally): CategoryType {
+  if (t.series >= t.movie && t.series > t.tv) return 'series'
+  if (t.movie >= t.series && t.movie > t.tv) return 'movie'
+  return 'tv'
+}
+
+// Lightweight client-side group extraction (mirrors the backend M3U parser).
+// Each group is typed TV/Movie/Series from its channels' stream URLs.
 function categoriesFromM3U(text: string): CategoryEntry[] {
-  const counts = new Map<string, number>()
+  const groups = new Map<string, GroupTally>()
   const lines = text.replace(/\r\n?/g, '\n').split('\n')
+  let pending: string | null = null
   for (const raw of lines) {
     const line = raw.trim()
-    if (!line.startsWith('#EXTINF')) continue
-    const m = /group-title="([^"]*)"/i.exec(line) || /group-title=([^\s,]+)/i.exec(line)
-    const group = (m && m[1].trim()) ? m[1].trim() : 'Uncategorized'
-    counts.set(group, (counts.get(group) || 0) + 1)
+    if (!line) continue
+    if (line.startsWith('#EXTINF')) {
+      const m = /group-title="([^"]*)"/i.exec(line) || /group-title=([^\s,]+)/i.exec(line)
+      pending = (m && m[1].trim()) ? m[1].trim() : 'Uncategorized'
+      if (!groups.has(pending)) groups.set(pending, { count: 0, tv: 0, movie: 0, series: 0 })
+    } else if (!line.startsWith('#') && pending) {
+      const g = groups.get(pending)!
+      g.count++
+      g[typeFromUrl(line)]++
+      pending = null
+    }
   }
-  return [...counts.entries()]
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  const order: Record<CategoryType, number> = { tv: 0, movie: 1, series: 2 }
+  return [...groups.entries()]
+    .map(([name, t]) => ({ name, count: t.count, type: dominantType(t) }))
+    .sort((a, b) => order[a.type] - order[b.type] || a.name.localeCompare(b.name))
 }
 
 async function loadCategories() {
