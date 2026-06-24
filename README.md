@@ -1,9 +1,13 @@
 <h1 align="center">NexoTV-Enhanced</h1>
 
 <p align="center">
-  <strong>Addon Stremio pour IPTV — sélection des catégories, catalogues configurables,
-  Films &amp; Séries Xtream, authentification et configurations sauvegardées.</strong>
+  <strong>Addon Stremio pour IPTV — <em>chaînes TV en direct</em> avant tout, plus catalogues
+  Films &amp; Séries, multi-source, sélection des catégories, authentification et configurations
+  sauvegardées.</strong>
 </p>
+
+> **La base reste l'IPTV : les chaînes de TV en direct.** L'addon diffuse vos chaînes live (Xtream,
+> M3U/M3U+, IPTV-org) dans Stremio ; les catalogues Films & Séries (Xtream) viennent **en plus**.
 
 ---
 
@@ -26,6 +30,7 @@ fonctionnalités au-dessus du code amont.
 
 | Domaine | Ajout |
 |---|---|
+| **Chaînes TV (live)** | Le cœur : diffuse vos **chaînes TV en direct** (Xtream, M3U/M3U+, IPTV-org) dans Stremio, avec EPG, logos et recherche. *(socle hérité de l'amont, conservé.)* |
 | **Multi-source** | Ajouter **plusieurs sources** Xtream/M3U mixées dans les mêmes catalogues, avec **déduplication Films/Séries** et choix du flux à la lecture. |
 | **Catégories** | La webui charge les catégories du flux, les **étiquette par type** (TV / Films / Séries) et permet de **cocher** celles à garder (filtre, tout / aucun / inverser). |
 | **Catalogues** | 3 mises en page : un seul catalogue, un par catégorie, ou des **catalogues personnalisés** (groupes nommés de catégories). |
