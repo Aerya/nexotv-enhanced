@@ -112,7 +112,7 @@ function buildCatalogs(opts: ManifestOptions) {
 export function createManifest(idPrefix?: string, options?: ManifestOptions) {
     const opts = options || {};
     return {
-        id: 'community.nexotv',
+        id: 'community.nexotv.enhanced',
         version: '2.0.0',
         name: env.ADDON_NAME,
         description: env.ADDON_DESCRIPTION,
