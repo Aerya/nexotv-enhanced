@@ -189,4 +189,20 @@ describe('createManifest', () => {
   it('uses the enhanced addon id', () => {
     expect(createManifest().id).toBe('community.nexotv.enhanced');
   });
+
+  it('single mode omits the TV catalog when only Movie/Series are selected', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'single',
+      selectedCategories: ['Action', 'Drama'],
+      categoryTypes: { Action: 'movie', Drama: 'series' },
+    });
+    const ids = m.catalogs.map((c: any) => c.id);
+    expect(ids).not.toContain('iptv_channels');
+    expect(ids).toEqual(expect.arrayContaining(['iptv_movies', 'iptv_series']));
+  });
+
+  it('single mode keeps the default TV catalog when nothing is selected', () => {
+    const m = createManifest('abc123', { catalogMode: 'single' });
+    expect(m.catalogs.map((c: any) => c.id)).toContain('iptv_channels');
+  });
 });

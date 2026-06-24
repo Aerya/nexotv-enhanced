@@ -179,6 +179,7 @@ export async function fetchData(addonInstance: any) {
     const selectedNames = selectedCategoryNames(config);
 
     if (wantTypes.has('movie')) {
+      try {
         const [vodCatsRaw, vodRaw] = await Promise.all([
             fetchJson(`${base}&action=get_vod_categories`, env.FETCH_TIMEOUT_MS),
             fetchJson(`${base}&action=get_vod_streams`, env.FETCH_TIMEOUT_MS),
@@ -203,9 +204,13 @@ export async function fetchData(addonInstance: any) {
             added++;
         }
         addonInstance.log?.debug('Xtream VOD added', { count: added });
+      } catch (e: any) {
+        addonInstance.log?.warn('[XTREAM] VOD fetch failed, skipping movies:', e?.message);
+      }
     }
 
     if (wantTypes.has('series')) {
+      try {
         const [serCatsRaw, serRaw] = await Promise.all([
             fetchJson(`${base}&action=get_series_categories`, env.FETCH_TIMEOUT_MS),
             fetchJson(`${base}&action=get_series`, env.FETCH_TIMEOUT_MS),
@@ -230,6 +235,9 @@ export async function fetchData(addonInstance: any) {
             added++;
         }
         addonInstance.log?.debug('Xtream series added', { count: added });
+      } catch (e: any) {
+        addonInstance.log?.warn('[XTREAM] Series fetch failed, skipping series:', e?.message);
+      }
     }
 
     if (config.enableEpg) {

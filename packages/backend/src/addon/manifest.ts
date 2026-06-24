@@ -114,9 +114,10 @@ function buildCatalogs(opts: ManifestOptions) {
     const seriesCats = categories.filter(c => typeOf(c, types) === 'series');
     const catalogs: any[] = [];
 
-    // TV catalog: always present (also the default when nothing is selected —
-    // genres are then filled at runtime from the loaded channels).
-    {
+    // TV catalog: present when TV categories are selected, or as the default
+    // when nothing is selected at all (genres then filled at runtime). Skipped
+    // when the user picked only Movie/Series categories — avoids an empty row.
+    if (tvCats.length > 0 || categories.length === 0) {
         const genres = tvCats.length > 0 ? ['All Channels', ...tvCats] : [];
         catalogs.push({
             type: 'tv',
