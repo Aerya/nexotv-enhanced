@@ -1,8 +1,8 @@
 version: '3.8'
 services:
   nexotv:
-    image: savibrabo/nexotv:latest
-    container_name: nexotv
+    image: ghcr.io/aerya/nexotv-enhanced:latest
+    container_name: nexotv-enhanced
     ports:
       - "7000:7000"
     env_file:

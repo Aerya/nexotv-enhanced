@@ -429,14 +429,16 @@ export class M3UEPGAddon {
         if (logoAttr && logoAttr.trim()) {
             finalUrl = logoAttr;
         } else {
-            finalUrl = `https://placehold.co/250x375/2b2b2b/FFFFFF.png?text=${encodeURIComponent(item.name || 'TV')}`;
+            // Square placeholder so channels without a logo match the poster shape.
+            finalUrl = `https://placehold.co/400x400/2b2b2b/FFFFFF.png?text=${encodeURIComponent(item.name || 'TV')}`;
         }
 
         if (this.config.reformatLogos && finalUrl.startsWith('http') && !finalUrl.includes('wsrv.nl') && !finalUrl.includes('placehold.co')) {
             if (finalUrl.includes('imgur.com')) {
                 finalUrl = `https://proxy.duckduckgo.com/iu/?u=${encodeURIComponent(finalUrl)}`;
             }
-            return `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}&w=250&h=375&fit=contain&we&bg=2b2b2b`;
+            // Square canvas (fit=contain) so wide/square channel logos display fully.
+            return `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}&w=400&h=400&fit=contain&we&bg=2b2b2b`;
         }
         return finalUrl;
     }
@@ -449,8 +451,10 @@ export class M3UEPGAddon {
             name: item.name,
             description: '📡 Live Channel',
             poster: logoUrl,
+            logo: logoUrl,
             background: logoUrl,
-            posterShape: 'poster',
+            // 'square' renders channel logos far better than the portrait 'poster' shape.
+            posterShape: 'square',
             genres: item.category
                 ? [item.category]
                 : (item.attributes?.['group-title'] ? [item.attributes['group-title']] : ['Live TV']),
@@ -519,8 +523,9 @@ export class M3UEPGAddon {
             type: 'tv',
             name: item.name,
             poster: logoUrl,
+            logo: logoUrl,
             background: logoUrl,
-            posterShape: 'poster',
+            posterShape: 'square',
             description,
             genres: item.category
                 ? [item.category]
