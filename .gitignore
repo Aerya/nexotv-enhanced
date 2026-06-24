@@ -36,12 +36,10 @@ packages/backend/.vitest-cache/
 
 # Project specific
 .agent/
-.claude/
 .temp/
 tmp/
 data/
 AGENT.md
-CLAUDE.md
 beamup.json
 docs/
 
