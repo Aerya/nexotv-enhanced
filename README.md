@@ -9,6 +9,19 @@
 > **La base reste l'IPTV : les chaînes de TV en direct.** L'addon diffuse vos chaînes live (Xtream,
 > M3U/M3U+, IPTV-org) dans Stremio ; les catalogues Films & Séries (Xtream) viennent **en plus**.
 
+<p align="center">
+  <a href="https://upandclear.org/2026/06/24/nexotv-enhanced/">
+    <img src="https://img.shields.io/badge/Article%20%26%20captures-upandclear.org-blue?style=for-the-badge" alt="Article & captures d'écran">
+  </a>
+</p>
+
+---
+
+## Article & captures d'écran
+
+Présentation détaillée, installation pas à pas et **captures d'écran** (webui + rendu Stremio/Nuvio) :
+**[upandclear.org — NexoTV Enhanced](https://upandclear.org/2026/06/24/nexotv-enhanced/)**
+
 ---
 
 ## Origine du projet (attribution)
