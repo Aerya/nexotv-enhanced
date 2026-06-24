@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  nexotv:
+    image: savibrabo/nexotv:latest
+    container_name: nexotv
+    ports:
+      - "7000:7000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

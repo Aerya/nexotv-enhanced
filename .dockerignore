@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+packages/*/node_modules/
+packages/*/dist/
+npm-debug.log*
+
+# Git
+.git
+.gitignore
+.github/
+
+# Environment files
+*.env
+test-credentials.env
+
+# Docker config
+Dockerfile
+docker-compose.yml
+
+# Documentation & dev-only files
+README.md
+LICENSE
+AGENT.md
+CLAUDE.md
+.claude/
+.agent/
+.temp/
+tmp/
+data/
+.dev/
+beamup.json
+docs/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+*.log
