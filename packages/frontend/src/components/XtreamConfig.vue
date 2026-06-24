@@ -1,7 +1,7 @@
 <template>
   <form class="config-form" autocomplete="off" @submit.prevent="handleSubmit">
     <fieldset>
-      <legend>Credentials</legend>
+      <legend>{{ t('Credentials', 'Identifiants') }}</legend>
       <div class="form-group">
         <label for="xtreamUrl">Base URL <span class="req">*</span></label>
         <input type="url" id="xtreamUrl" v-model="form.xtreamUrl" required
@@ -22,7 +22,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>Categories</legend>
+      <legend>{{ t('Categories', 'Catégories') }}</legend>
       <div class="info-banner">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -37,7 +37,7 @@
 
       <div class="form-group">
         <button type="button" class="btn ghost" :disabled="loadingCats" @click="loadCategories">
-          {{ loadingCats ? 'Loading…' : (categoriesLoaded ? 'Reload categories' : 'Load categories') }}
+          {{ loadingCats ? t('Loading…', 'Chargement…') : (categoriesLoaded ? t('Reload categories', 'Recharger les catégories') : t('Load categories', 'Charger les catégories')) }}
         </button>
         <small v-if="catsError" class="hint warn">{{ catsError }}</small>
       </div>
@@ -53,7 +53,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>EPG Options</legend>
+      <legend>{{ t('EPG Options', 'Options EPG') }}</legend>
       <div class="form-group checkbox-line">
         <input type="checkbox" id="enableEpg" v-model="form.enableEpg">
         <label class="checkbox-label" for="enableEpg">Enable EPG</label>
@@ -94,7 +94,7 @@
     </fieldset>
 
     <fieldset>
-      <legend>Display</legend>
+      <legend>{{ t('Display', 'Affichage') }}</legend>
       <div class="form-group">
         <label for="catalogName">Catalog Name</label>
         <input type="text" id="catalogName" v-model="form.catalogName"
@@ -104,9 +104,9 @@
     </fieldset>
 
     <div class="form-actions">
-      <button type="button" class="btn ghost" @click="handleSave">Save configuration</button>
+      <button type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
       <button type="submit" class="btn primary">
-        Install Addon
+        {{ t('Install Addon', 'Installer l\'addon') }}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 12h14M12 5l7 7-7 7"/>
@@ -123,7 +123,10 @@ import { useAddonInfo } from '../composables/useAddonInfo'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
+import { useI18n } from '../composables/useI18n'
 import type { XtreamConfig, CatalogMode, CatalogGroup } from '../types/config'
+
+const { t } = useI18n()
 
 const oc = inject<any>('overlayControl')!
 const { info: addonInfo } = useAddonInfo()

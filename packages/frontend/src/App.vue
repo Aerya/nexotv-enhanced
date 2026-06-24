@@ -7,14 +7,14 @@
 
     <template v-else-if="auth.state.ready">
     <div v-if="auth.state.enabled" class="logout-bar">
-      <button class="btn tiny ghost" @click="auth.logout()">Log out</button>
+      <button class="btn tiny ghost" @click="auth.logout()">{{ t('Log out', 'Déconnexion') }}</button>
     </div>
 
     <main class="main-content">
       <section class="config-section">
         <SavedConfigs />
         <div class="card configurator-card">
-          <h2>Provider</h2>
+          <h2>{{ t('Provider', 'Fournisseur') }}</h2>
 
           <!-- Provider Tabs -->
           <div class="provider-tabs" role="tablist">
@@ -23,7 +23,7 @@
               :aria-selected="activeTab === 'iptv-org'"
               aria-controls="panel-iptv-org"
               @click="activeTab = 'iptv-org'">
-              IPTV-org <span class="tab-badge">Free</span>
+              IPTV-org <span class="tab-badge">{{ t('Free', 'Gratuit') }}</span>
             </button>
             <button class="tab-btn" :class="{ active: activeTab === 'xtream' }"
               id="tab-xtream" role="tab"
@@ -73,20 +73,19 @@
 
       <section class="about-section">
         <div class="card about-card">
-          <h2>About</h2>
-          <p>Connect your IPTV service to Stremio. Choose from free public channels, your Xtream Codes
-            subscription, or any M3U playlist URL.</p>
+          <h2>{{ t('About', 'À propos') }}</h2>
+          <p>{{ t('Connect your IPTV service to Stremio. Choose from free public channels, your Xtream Codes subscription, or any M3U playlist URL.', 'Connectez votre service IPTV à Stremio. Au choix : chaînes publiques gratuites, abonnement Xtream Codes, ou n\'importe quelle URL de playlist M3U.') }}</p>
           <ul class="feature-list">
-            <li><strong>IPTV-org</strong> – thousands of free public channels, no credentials needed.</li>
-            <li><strong>Xtream API</strong> – connects your subscription panel (live TV only).</li>
-            <li><strong>M3U / M3U+</strong> – paste any playlist URL; EPG auto-detected from header.</li>
-            <li><strong>EPG</strong> – panel XMLTV, custom XMLTV URL, or auto-detected.</li>
-            <li><strong>EPG offset</strong> – adjusts programme times for timezone correction.</li>
+            <li><strong>IPTV-org</strong> – {{ t('thousands of free public channels, no credentials needed.', 'des milliers de chaînes publiques gratuites, sans identifiants.') }}</li>
+            <li><strong>Xtream API</strong> – {{ t('connects your subscription panel.', 'connecte votre panel d\'abonnement.') }}</li>
+            <li><strong>M3U / M3U+</strong> – {{ t('paste any playlist URL; EPG auto-detected from header.', 'collez une URL de playlist ; EPG auto-détecté depuis l\'en-tête.') }}</li>
+            <li><strong>{{ t('Multi-source', 'Multi-source') }}</strong> – {{ t('mix several sources with movie/series de-duplication.', 'mixez plusieurs sources avec déduplication films/séries.') }}</li>
+            <li><strong>EPG</strong> – {{ t('panel XMLTV, custom XMLTV URL, or auto-detected.', 'XMLTV du panel, URL XMLTV personnalisée, ou auto-détecté.') }}</li>
           </ul>
           <div class="credits">
             <p>
-              By <a href="https://github.com/joaosavi" target="_blank" rel="noopener">joaosavi</a>
-              · Enhanced by <a href="https://github.com/Aerya/nexotv-enhanced" target="_blank" rel="noopener">Aerya</a>
+              {{ t('By', 'Par') }} <a href="https://github.com/joaosavi" target="_blank" rel="noopener">joaosavi</a>
+              · {{ t('Enhanced by', 'Amélioré par') }} <a href="https://github.com/Aerya/nexotv-enhanced" target="_blank" rel="noopener">Aerya</a>
             </p>
           </div>
         </div>
@@ -121,11 +120,13 @@ import { useManifestPoll } from './composables/useManifestPoll'
 import { useConfigToken } from './composables/useConfigToken'
 import { useDecodedToken } from './composables/useDecodedToken'
 import { useAuth } from './composables/useAuth'
+import { useI18n } from './composables/useI18n'
 import type { Provider } from './types/config'
 
 const poll = useManifestPoll()
 const { buildUrls } = useConfigToken(poll.appendDetail)
 const auth = useAuth()
+const { t } = useI18n()
 
 // Provide overlay control to all child components
 provide('overlayControl', {

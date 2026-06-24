@@ -6,49 +6,49 @@
         <circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path>
       </svg>
       <span>
-        Ajoute plusieurs sources (Xtream / M3U) mixées dans les mêmes catalogues. Les
-        <strong>Films &amp; Séries</strong> de même titre sont <strong>dédupliqués</strong> (un seul
-        élément, un flux par source). Les chaînes TV restent listées par source.
+        {{ t('Add several sources (Xtream / M3U) mixed into the same catalogs.', 'Ajoute plusieurs sources (Xtream / M3U) mixées dans les mêmes catalogues.') }}
+        <strong>{{ t('Movies & Series', 'Films & Séries') }}</strong>
+        {{ t('with the same title are de-duplicated (one item, one stream per source). TV channels stay listed per source.', 'de même titre sont dédupliqués (un seul élément, un flux par source). Les chaînes TV restent listées par source.') }}
       </span>
     </div>
 
     <fieldset v-for="(s, si) in sources" :key="s.id" class="source-card">
-      <legend>Source {{ si + 1 }}</legend>
+      <legend>{{ t('Source', 'Source') }} {{ si + 1 }}</legend>
       <div class="src-head">
-        <input class="src-name" type="text" v-model="s.name" placeholder="Nom (ex. IPTV1)">
+        <input class="src-name" type="text" v-model="s.name" :placeholder="t('Name (e.g. IPTV1)', 'Nom (ex. IPTV1)')">
         <select v-model="s.provider" class="src-provider">
           <option value="xtream">Xtream</option>
           <option value="m3u">M3U</option>
         </select>
-        <button type="button" class="btn tiny ghost danger" @click="removeSource(si)">Retirer</button>
+        <button type="button" class="btn tiny ghost danger" @click="removeSource(si)">{{ t('Remove', 'Retirer') }}</button>
       </div>
 
       <template v-if="s.provider === 'xtream'">
         <div class="form-group"><label>Base URL</label>
           <input type="url" v-model="s.xtreamUrl" placeholder="http://panel:8080"></div>
-        <div class="form-group"><label>Username</label><input type="text" v-model="s.xtreamUsername"></div>
-        <div class="form-group"><label>Password</label><input type="password" v-model="s.xtreamPassword"></div>
+        <div class="form-group"><label>{{ t('Username', 'Identifiant') }}</label><input type="text" v-model="s.xtreamUsername"></div>
+        <div class="form-group"><label>{{ t('Password', 'Mot de passe') }}</label><input type="password" v-model="s.xtreamPassword"></div>
       </template>
       <template v-else>
-        <div class="form-group"><label>Playlist URL</label>
+        <div class="form-group"><label>{{ t('Playlist URL', 'URL de la playlist') }}</label>
           <input type="url" v-model="s.m3uUrl" placeholder="http://provider/get.php?...type=m3u_plus"></div>
       </template>
 
       <div class="form-group">
         <button type="button" class="btn ghost" :disabled="s.loading" @click="loadSource(s)">
-          {{ s.loading ? 'Chargement…' : (s.loaded ? 'Recharger les catégories' : 'Charger les catégories') }}
+          {{ s.loading ? t('Loading…', 'Chargement…') : (s.loaded ? t('Reload categories', 'Recharger les catégories') : t('Load categories', 'Charger les catégories')) }}
         </button>
         <small v-if="s.error" class="hint warn">{{ s.error }}</small>
       </div>
 
       <div v-if="s.loaded" class="src-picker">
         <div class="cat-toolbar">
-          <input type="text" class="cat-filter" v-model="s.filter" placeholder="Filtrer…">
+          <input type="text" class="cat-filter" v-model="s.filter" :placeholder="t('Filter…', 'Filtrer…')">
           <span class="cat-count">{{ s.selected.length }} / {{ s.categories.length }}</span>
         </div>
         <div class="cat-actions">
-          <button type="button" class="btn tiny ghost" @click="selectAll(s)">Tout</button>
-          <button type="button" class="btn tiny ghost" @click="s.selected = []">Aucun</button>
+          <button type="button" class="btn tiny ghost" @click="selectAll(s)">{{ t('All', 'Tout') }}</button>
+          <button type="button" class="btn tiny ghost" @click="s.selected = []">{{ t('None', 'Aucun') }}</button>
         </div>
         <div class="cat-list">
           <label v-for="c in filteredCats(s)" :key="c.type + '::' + c.name" class="cat-item"
@@ -62,11 +62,11 @@
       </div>
     </fieldset>
 
-    <button type="button" class="btn ghost add-src" @click="addSource">+ Ajouter une source</button>
+    <button type="button" class="btn ghost add-src" @click="addSource">+ {{ t('Add a source', 'Ajouter une source') }}</button>
 
     <fieldset v-if="mergedCategories.length">
-      <legend>Catalogues</legend>
-      <p class="hint">Construits à partir des catégories <strong>fusionnées</strong> de toutes les sources.</p>
+      <legend>{{ t('Catalogs', 'Catalogues') }}</legend>
+      <p class="hint">{{ t('Built from the merged categories of all sources.', 'Construits à partir des catégories fusionnées de toutes les sources.') }}</p>
       <CategorySelector
         v-model="globalSelected"
         v-model:mode="catalogMode"
@@ -77,29 +77,29 @@
     </fieldset>
 
     <fieldset>
-      <legend>Lecture</legend>
+      <legend>{{ t('Playback', 'Lecture') }}</legend>
       <div class="form-group">
-        <label class="group-label">Lecture d'un contenu</label>
+        <label class="group-label">{{ t('When playing a title', 'Lecture d\'un contenu') }}</label>
         <div class="radio-group">
           <label class="checkbox-line">
             <input type="radio" name="multiStream" value="choose" v-model="streamSelection">
-            <span class="checkbox-label"><strong>Proposer le choix</strong> — un flux par source (IPTV1, IPTV2…).</span>
+            <span class="checkbox-label"><strong>{{ t('Offer the choice', 'Proposer le choix') }}</strong> — {{ t('one stream per source (IPTV1, IPTV2…).', 'un flux par source (IPTV1, IPTV2…).') }}</span>
           </label>
           <label class="checkbox-line">
             <input type="radio" name="multiStream" value="auto" v-model="streamSelection">
-            <span class="checkbox-label"><strong>Lire le 1er dispo</strong> — flux de la source prioritaire.</span>
+            <span class="checkbox-label"><strong>{{ t('Play the first available', 'Lire le 1er dispo') }}</strong> — {{ t('stream from the priority source.', 'flux de la source prioritaire.') }}</span>
           </label>
         </div>
       </div>
       <div class="form-group">
-        <label for="multiCatalogName">Catalog Name</label>
+        <label for="multiCatalogName">{{ t('Catalog Name', 'Nom du catalogue') }}</label>
         <input type="text" id="multiCatalogName" v-model="catalogName" placeholder="NexoTV-Enhanced">
       </div>
     </fieldset>
 
     <div class="form-actions">
-      <button type="button" class="btn ghost" @click="handleSave">Save configuration</button>
-      <button type="submit" class="btn primary">Install Addon</button>
+      <button type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
+      <button type="submit" class="btn primary">{{ t('Install Addon', 'Installer l\'addon') }}</button>
     </div>
   </form>
 </template>
@@ -110,9 +110,11 @@ import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
 import CategorySelector from './CategorySelector.vue'
+import { useI18n } from '../composables/useI18n'
 import type { CategoryType, CatalogMode, StreamSelection, MultiConfig, SourceConfig, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
+const { t } = useI18n()
 
 interface Entry { name: string; count?: number; type?: CategoryType }
 interface SourceState {
@@ -252,13 +254,13 @@ async function loadM3u(s: SourceState): Promise<Entry[]> {
 
 async function loadSource(s: SourceState) {
   s.error = ''
-  if (s.provider === 'xtream' && (!s.xtreamUrl || !s.xtreamUsername || !s.xtreamPassword)) { s.error = 'URL / identifiants requis.'; return }
-  if (s.provider === 'm3u' && !s.m3uUrl) { s.error = 'URL de playlist requise.'; return }
+  if (s.provider === 'xtream' && (!s.xtreamUrl || !s.xtreamUsername || !s.xtreamPassword)) { s.error = t('URL / credentials required.', 'URL / identifiants requis.'); return }
+  if (s.provider === 'm3u' && !s.m3uUrl) { s.error = t('Playlist URL required.', 'URL de playlist requise.'); return }
   s.loading = true
-  oc.showOverlay(true); oc.setProgress(10, 'Chargement catégories'); oc.appendDetail(`== ${s.name || s.id} ==`)
+  oc.showOverlay(true); oc.setProgress(10, 'Loading categories'); oc.appendDetail(`== ${s.name || s.id} ==`)
   try {
     const entries = s.provider === 'xtream' ? await loadXtream(s) : await loadM3u(s)
-    if (!entries.length) throw new Error('Aucune catégorie trouvée.')
+    if (!entries.length) throw new Error(t('No category found.', 'Aucune catégorie trouvée.'))
     s.categories = entries; s.loaded = true
     oc.appendDetail(`✔ ${entries.length} catégories`); oc.setProgress(100, 'OK'); oc.hideOverlay()
   } catch (e: any) { s.error = e.message || String(e); oc.appendDetail('✖ ' + s.error); oc.markError() }
@@ -320,21 +322,21 @@ function buildConfig(): (MultiConfig & { catalogName?: string }) | null {
 
 async function handleInstall() {
   const config = buildConfig()
-  if (!config) { alert('Ajoute au moins une source avec des catégories sélectionnées.'); return }
+  if (!config) { alert(t('Add at least one source with selected categories.', 'Ajoute au moins une source avec des catégories sélectionnées.')); return }
   oc.showOverlay(false); oc.setProgress(5, 'Building…')
   try {
     const { manifestUrl, stremioUrl } = await oc.buildUrls(config)
     oc.startPolling(manifestUrl, stremioUrl, 10)
-  } catch (e: any) { oc.hideOverlay(); alert('Erreur: ' + e.message) }
+  } catch (e: any) { oc.hideOverlay(); alert(t('Error: ', 'Erreur : ') + e.message) }
 }
 
 async function handleSave() {
   const config = buildConfig()
-  if (!config) { alert('Ajoute au moins une source avec des catégories sélectionnées.'); return }
-  const name = prompt('Nom de la configuration :', catalogName.value.trim() || 'Multi-source')
+  if (!config) { alert(t('Add at least one source with selected categories.', 'Ajoute au moins une source avec des catégories sélectionnées.')); return }
+  const name = prompt(t('Name this configuration:', 'Nom de la configuration :'), catalogName.value.trim() || 'Multi-source')
   if (!name) return
-  try { await useSavedConfigs().save(name.trim(), config as any); alert('Configuration sauvegardée.') }
-  catch (e: any) { alert('Échec : ' + (e.message || e)) }
+  try { await useSavedConfigs().save(name.trim(), config as any); alert(t('Configuration saved.', 'Configuration sauvegardée.')) }
+  catch (e: any) { alert(t('Save failed: ', 'Échec : ') + (e.message || e)) }
 }
 
 onMounted(() => {
