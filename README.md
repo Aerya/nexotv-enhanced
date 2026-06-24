@@ -80,7 +80,7 @@ fonctionnalités au-dessus du code amont.
 | ![Addon installé](screenshots/7.png) | ![Accueil Stremio](screenshots/8.png) |
 | Addon **NexoTV Enhanced** installé. | Catalogues TV King / Films King / Séries King. |
 | ![Fiche film + synopsis](screenshots/9.png) | ![Multi-source : choix du flux](screenshots/14.png) |
-| Fiche film avec **synopsis**, note et genres. | Un film, **deux flux** (King365 / Pierot+) — multi-source. |
+| Fiche film avec **synopsis**, note et genres. | Un film, **deux flux** (King365 / Prime+) — multi-source. |
 
 ### Nuvio
 
