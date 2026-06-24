@@ -149,8 +149,9 @@ const categories = ref<CategoryEntry[]>([])
 const categoriesLoaded = ref(false)
 const loadingCats = ref(false)
 const catsError = ref('')
-// Cached live-streams list to avoid re-fetching during install (keyed by creds).
+// Cached results to avoid re-fetching during install (keyed by creds).
 let cachedLiveList: any[] | null = null
+let cachedCategoryEntries: CategoryEntry[] | null = null
 let cachedLiveKey = ''
 
 onMounted(() => {
@@ -192,12 +193,16 @@ function credsKey() {
   return `${normalizeUrl(form.xtreamUrl)}|${form.xtreamUsername.trim()}|${form.xtreamPassword}`
 }
 
-async function fetchLiveList(): Promise<any[]> {
+function apiBase(): string {
   const baseUrl = normalizeUrl(form.xtreamUrl)
   const username = form.xtreamUsername.trim()
   let password = form.xtreamPassword
   if (password === '********' && originalPassword) password = originalPassword
-  const base = `${baseUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+  return `${baseUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+}
+
+async function fetchLiveList(): Promise<any[]> {
+  const base = apiBase()
   let txt: string
   try {
     txt = await robustFetch(`${base}&action=get_live_streams`, 'live_streams', true)
@@ -207,21 +212,72 @@ async function fetchLiveList(): Promise<any[]> {
   let list: any[] = []
   try { list = JSON.parse(txt) } catch { throw new Error('Failed to parse live streams JSON') }
   if (!Array.isArray(list)) list = []
-  cachedLiveList = list
-  cachedLiveKey = credsKey()
   return list
 }
 
-function categoriesFromLiveList(list: any[]): CategoryEntry[] {
-  const counts = new Map<string, number>()
-  for (const l of list) {
-    const c = (l.category_name || l.category || '').toString().trim()
-    if (!c) continue
-    counts.set(c, (counts.get(c) || 0) + 1)
+async function fetchLiveCategories(): Promise<any[]> {
+  const base = apiBase()
+  let txt: string
+  try {
+    txt = await robustFetch(`${base}&action=get_live_categories`, 'live_categories', true)
+  } catch {
+    try {
+      txt = await robustFetch(`${base}&action=get_live_categories`, 'live_categories', false)
+    } catch {
+      return []
+    }
   }
-  return [...counts.entries()]
-    .map(([name, count]) => ({ name, count }))
+  try {
+    const list = JSON.parse(txt)
+    return Array.isArray(list) ? list : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Build the category list. Category *names* come from get_live_categories
+ * (live streams only carry category_id), and channel counts are derived by
+ * mapping each stream's category_id back to its name. Falls back to any
+ * category_name/category present on the streams when the panel omits them.
+ */
+function buildCategoryEntries(cats: any[], live: any[]): CategoryEntry[] {
+  const idToName = new Map<string, string>()
+  for (const c of cats) {
+    if (c && c.category_id != null && c.category_name) {
+      idToName.set(String(c.category_id), String(c.category_name).trim())
+    }
+  }
+  const counts = new Map<string, number>()
+  for (const l of live) {
+    let name = ''
+    if (l.category_id != null && idToName.has(String(l.category_id))) {
+      name = idToName.get(String(l.category_id))!
+    } else {
+      name = (l.category_name || l.category || '').toString().trim()
+    }
+    if (!name) continue
+    counts.set(name, (counts.get(name) || 0) + 1)
+  }
+  // Union of declared categories and any category actually seen on a stream.
+  const names = new Set<string>([...idToName.values(), ...counts.keys()])
+  return [...names]
+    .filter(Boolean)
+    .map(name => ({ name, count: counts.get(name) || 0 }))
     .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Fetch + cache categories and the live list for the current credentials. */
+async function loadCategoryEntries(): Promise<{ entries: CategoryEntry[]; live: any[] }> {
+  if (cachedCategoryEntries && cachedLiveList && cachedLiveKey === credsKey()) {
+    return { entries: cachedCategoryEntries, live: cachedLiveList }
+  }
+  const [cats, live] = await Promise.all([fetchLiveCategories(), fetchLiveList()])
+  const entries = buildCategoryEntries(cats, live)
+  cachedCategoryEntries = entries
+  cachedLiveList = live
+  cachedLiveKey = credsKey()
+  return { entries, live }
 }
 
 async function loadCategories() {
@@ -237,12 +293,11 @@ async function loadCategories() {
   oc.setProgress(10, 'Loading categories')
   oc.appendDetail('== LOAD CATEGORIES (XTREAM) ==')
   try {
-    const list = await fetchLiveList()
-    const cats = categoriesFromLiveList(list)
-    if (cats.length === 0) throw new Error('No categories found in this panel.')
-    categories.value = cats
+    const { entries, live } = await loadCategoryEntries()
+    if (entries.length === 0) throw new Error('No categories found in this panel.')
+    categories.value = entries
     categoriesLoaded.value = true
-    oc.appendDetail(`✔ ${cats.length} categories across ${list.length} channels`)
+    oc.appendDetail(`✔ ${entries.length} categories across ${live.length} channels`)
     oc.setProgress(100, 'Categories loaded')
     oc.hideOverlay()
   } catch (e: any) {
@@ -363,25 +418,15 @@ async function handleSubmit() {
 
   let enableEpgFinal = enableEpgInitial
   try {
-    let liveCount = 0
-    const categorySet = new Set<string>()
     let epgStats = { programmes: 0, channels: 0 }
 
     oc.setProgress(12, 'Fetching Live Streams')
-    let liveList: any[]
-    if (cachedLiveList && cachedLiveKey === credsKey()) {
-      liveList = cachedLiveList
-      oc.appendDetail('✔ Reusing categories already loaded')
-    } else {
-      liveList = await fetchLiveList()
-    }
-    liveCount = Array.isArray(liveList) ? liveList.length : 0
-    oc.appendDetail(`✔ Live streams: ${liveCount.toLocaleString()}`)
-
-    for (const l of liveList) {
-      const c = l.category_name || l.category || ''
-      if (c) categorySet.add(c)
-    }
+    // Categories come from get_live_categories (mapped by id); the live list
+    // gives the channel count. loadCategoryEntries() caches both.
+    const { entries: categoryEntries, live: liveList } = await loadCategoryEntries()
+    const categorySet = new Set(categoryEntries.map(e => e.name))
+    const liveCount = Array.isArray(liveList) ? liveList.length : 0
+    oc.appendDetail(`✔ Live streams: ${liveCount.toLocaleString()} · ${categorySet.size} categories`)
 
     if (enableEpgInitial) {
       const epgSourceUrl = epgMode === 'custom'
