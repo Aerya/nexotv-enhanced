@@ -1,5 +1,7 @@
 export type Provider = 'xtream' | 'iptv-org' | 'm3u';
 
+export type CatalogMode = 'single' | 'split';
+
 export interface XtreamConfig {
   provider: 'xtream';
   xtreamUrl: string;
@@ -9,6 +11,8 @@ export interface XtreamConfig {
   epgUrl?: string;
   epgOffsetHours?: number;
   reformatLogos: boolean;
+  selectedCategories?: string[];
+  catalogMode?: CatalogMode;
   prescan?: {
     liveCount: number;
     categoryCount: number;
@@ -34,6 +38,8 @@ export interface M3uConfig {
   epgOffsetHours?: number;
   reformatLogos: boolean;
   globalUserAgent?: string;
+  selectedCategories?: string[];
+  catalogMode?: CatalogMode;
 }
 
 export type AddonConfig = (XtreamConfig | IptvOrgConfig | M3uConfig) & { catalogName?: string };

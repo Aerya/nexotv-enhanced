@@ -39,10 +39,30 @@ export interface AddonConfig {
     instanceId?: string;
     catalogName?: string;
     globalUserAgent?: string;
+    /** Categories the user picked on the config page. Empty/undefined = all. */
+    selectedCategories?: string[];
+    /** 'single' = one combined catalog, 'split' = one catalog per category. */
+    catalogMode?: 'single' | 'split';
+}
+
+/** Read a channel's category, regardless of provider shape. */
+function channelCategory(item: any): string | undefined {
+    return item?.category || item?.attributes?.['group-title'];
 }
 
 function stableStringify(obj: any) {
     return JSON.stringify(obj, Object.keys(obj).sort());
+}
+
+/** Normalize the selected categories into a stable, comparable form. */
+function normalizeSelection(config: AddonConfig) {
+    const cats = (config.selectedCategories || [])
+        .map(c => (typeof c === 'string' ? c.trim() : ''))
+        .filter(Boolean);
+    return {
+        catalogMode: config.catalogMode === 'split' ? 'split' : 'single',
+        selectedCategories: [...new Set(cats)].sort(),
+    };
 }
 
 export function createCacheKey(config: AddonConfig) {
@@ -63,6 +83,7 @@ export function createCacheKey(config: AddonConfig) {
             epgOffsetHours: config.epgOffsetHours,
             reformatLogos: !!config.reformatLogos,
             globalUserAgent: config.globalUserAgent || null,
+            ...normalizeSelection(config),
         };
     } else {
         minimal = {
@@ -72,7 +93,8 @@ export function createCacheKey(config: AddonConfig) {
             xtreamUrl: config.xtreamUrl,
             xtreamUsername: config.xtreamUsername,
             epgOffsetHours: config.epgOffsetHours,
-            reformatLogos: !!config.reformatLogos
+            reformatLogos: !!config.reformatLogos,
+            ...normalizeSelection(config),
         };
     }
     return crypto.createHash('md5').update(stableStringify(minimal)).digest('hex');
@@ -206,16 +228,51 @@ export class M3UEPGAddon {
         await this.loadEpgFromCache();
     }
 
+    /** Selected category names (trimmed, de-duped). Empty array = all categories. */
+    selectedCategorySet(): Set<string> {
+        return new Set(
+            (this.config.selectedCategories || [])
+                .map(c => (typeof c === 'string' ? c.trim() : ''))
+                .filter(Boolean)
+        );
+    }
+
+    /** Keep only channels whose category was selected (no selection = keep all). */
+    filterBySelectedCategories(items: any[]): any[] {
+        const selected = this.selectedCategorySet();
+        if (selected.size === 0) return items;
+        return items.filter(i => {
+            const cat = channelCategory(i);
+            return cat ? selected.has(cat.trim()) : false;
+        });
+    }
+
+    /** In 'split' mode, map a per-category catalog id back to its category name. */
+    getCategoryForCatalogId(id: string): string | null {
+        if (this.config.catalogMode !== 'split') return null;
+        if (!id.startsWith('iptv_cat_')) return null;
+        const idx = parseInt(id.slice('iptv_cat_'.length), 10);
+        if (!Number.isInteger(idx)) return null;
+        const cats = (this.config.selectedCategories || [])
+            .map(c => (typeof c === 'string' ? c.trim() : ''))
+            .filter(Boolean);
+        return cats[idx] ?? null;
+    }
+
     buildGenresInManifest() {
         if (!this.manifestRef) return;
+        // In split mode there is no combined catalog to attach genres to.
         const tvCatalog = this.manifestRef.catalogs.find((c: any) => c.id === 'iptv_channels');
         if (tvCatalog) {
+            const selected = this.selectedCategorySet();
             const groups = [
                 ...new Set(
                     this.channels
                         .map(c => c.category || c.attributes?.['group-title'])
                         .filter(Boolean)
                         .map((s: string) => s.trim())
+                        // When the user picked a subset, restrict genres to it.
+                        .filter((s: string) => selected.size === 0 || selected.has(s))
                 )
             ].sort((a: any, b: any) => a.localeCompare(b));
             if (!groups.includes('All Channels')) groups.unshift('All Channels');

@@ -58,4 +58,45 @@ describe('createManifest', () => {
     const m = createManifest();
     expect(m.catalogs.length).toBeGreaterThan(0);
   });
+
+  it('single mode (default) produces one combined catalog', () => {
+    const m = createManifest('abc123', { catalogMode: 'single' });
+    expect(m.catalogs).toHaveLength(1);
+    expect(m.catalogs[0].id).toBe('iptv_channels');
+  });
+
+  it('single mode with selected categories exposes them as genre options', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'single',
+      selectedCategories: ['Sports', 'News'],
+    });
+    expect(m.catalogs).toHaveLength(1);
+    const genreExtra = (m.catalogs[0] as any).extra.find((e: any) => e.name === 'genre');
+    expect(genreExtra.options).toEqual(expect.arrayContaining(['All Channels', 'Sports', 'News']));
+  });
+
+  it('split mode produces one catalog per selected category', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'split',
+      selectedCategories: ['Sports', 'News', 'Movies'],
+    });
+    expect(m.catalogs).toHaveLength(3);
+    expect(m.catalogs.map((c: any) => c.id)).toEqual(['iptv_cat_0', 'iptv_cat_1', 'iptv_cat_2']);
+    expect(m.catalogs.map((c: any) => c.name)).toEqual(['Sports', 'News', 'Movies']);
+  });
+
+  it('split mode with no categories falls back to a single catalog', () => {
+    const m = createManifest('abc123', { catalogMode: 'split', selectedCategories: [] });
+    expect(m.catalogs).toHaveLength(1);
+    expect(m.catalogs[0].id).toBe('iptv_channels');
+  });
+
+  it('split mode prefixes catalog names with the catalog name when set', () => {
+    const m = createManifest('abc123', {
+      catalogName: 'MyTV',
+      catalogMode: 'split',
+      selectedCategories: ['Sports'],
+    });
+    expect(m.catalogs[0].name).toBe('MyTV · Sports');
+  });
 });

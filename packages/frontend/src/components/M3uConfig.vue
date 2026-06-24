@@ -45,6 +45,36 @@
     </fieldset>
 
     <fieldset>
+      <legend>Categories</legend>
+      <div class="info-banner">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 16v-4M12 8h.01"></path>
+        </svg>
+        <span>
+          Load the categories (<code>group-title</code>) from the playlist, then pick the ones you
+          want. Leave it untouched to include <strong>all</strong> categories in a single catalog.
+        </span>
+      </div>
+
+      <div class="form-group">
+        <button type="button" class="btn ghost" :disabled="loadingCats" @click="loadCategories">
+          {{ loadingCats ? 'Loading…' : (categoriesLoaded ? 'Reload categories' : 'Load categories') }}
+        </button>
+        <small v-if="catsError" class="hint warn">{{ catsError }}</small>
+      </div>
+
+      <CategorySelector
+        v-if="categoriesLoaded"
+        v-model="form.selectedCategories"
+        v-model:mode="form.catalogMode"
+        :categories="categories"
+        modeName="m3uCatalogMode"
+      />
+    </fieldset>
+
+    <fieldset>
       <legend>EPG Options</legend>
 
       <div class="form-group checkbox-line">
@@ -144,10 +174,11 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, inject, onMounted } from 'vue'
+import { reactive, ref, inject, onMounted } from 'vue'
 import { usePublicPlaylists } from '../composables/usePublicPlaylists'
 import { useDecodedToken } from '../composables/useDecodedToken'
-import type { M3uConfig } from '../types/config'
+import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
+import type { M3uConfig, CatalogMode } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
 const { playlists } = usePublicPlaylists()
@@ -170,7 +201,96 @@ const form = reactive({
   catalogName: '',
   userAgentPreset: '',
   globalUserAgent: '',
+  selectedCategories: [] as string[],
+  catalogMode: 'single' as CatalogMode,
 })
+
+// Category loading state
+const categories = ref<CategoryEntry[]>([])
+const categoriesLoaded = ref(false)
+const loadingCats = ref(false)
+const catsError = ref('')
+let knownCategoryNames = new Set<string>()
+
+async function fetchPlaylistText(url: string): Promise<string> {
+  const mixed = window.location.protocol === 'https:' && /^http:\/\//i.test(url)
+  if (!mixed) {
+    try {
+      oc.appendDetail(`→ (Browser) Fetching playlist: ${url}`)
+      const res = await fetch(url, { method: 'GET' })
+      if (res.ok) {
+        const txt = await res.text()
+        oc.appendDetail(`✔ (Browser) playlist ${txt.length.toLocaleString()} bytes`)
+        return txt
+      }
+      oc.appendDetail(`⚠ Browser fetch HTTP ${res.status} → server fallback`)
+    } catch (e: any) {
+      oc.appendDetail(`⚠ Browser fetch failed (${e.message}) → server fallback`)
+    }
+  }
+  oc.appendDetail(`→ (Server) Prefetch playlist: ${url}`)
+  const res = await fetch('/api/prefetch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, purpose: 'm3u_categories' })
+  })
+  let payload: any = {}
+  try { payload = await res.json() } catch {}
+  if (!res.ok || !payload.ok || !payload.content) {
+    throw new Error(payload.error || `Server prefetch failed (HTTP ${res.status})`)
+  }
+  if (payload.truncated) {
+    throw new Error('Playlist truncated by server (increase PREFETCH_MAX_BYTES).')
+  }
+  oc.appendDetail(`✔ (Server) playlist ${payload.bytes.toLocaleString()} bytes`)
+  return payload.content
+}
+
+// Lightweight client-side group-title extraction (mirrors the backend M3U parser).
+function categoriesFromM3U(text: string): CategoryEntry[] {
+  const counts = new Map<string, number>()
+  const lines = text.replace(/\r\n?/g, '\n').split('\n')
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line.startsWith('#EXTINF')) continue
+    const m = /group-title="([^"]*)"/i.exec(line) || /group-title=([^\s,]+)/i.exec(line)
+    const group = (m && m[1].trim()) ? m[1].trim() : 'Uncategorized'
+    counts.set(group, (counts.get(group) || 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function loadCategories() {
+  const url = form.m3uUrl.trim()
+  if (!url) { catsError.value = 'Enter a playlist URL first.'; return }
+  try { new URL(url) } catch { catsError.value = 'Enter a valid playlist URL first.'; return }
+
+  catsError.value = ''
+  loadingCats.value = true
+  oc.showOverlay(true)
+  oc.setProgress(10, 'Loading categories')
+  oc.appendDetail('== LOAD CATEGORIES (M3U) ==')
+  try {
+    const text = await fetchPlaylistText(url)
+    const cats = categoriesFromM3U(text)
+    if (cats.length === 0) throw new Error('No categories found in this playlist.')
+    categories.value = cats
+    knownCategoryNames = new Set(cats.map(c => c.name))
+    categoriesLoaded.value = true
+    const total = cats.reduce((n, c) => n + (c.count || 0), 0)
+    oc.appendDetail(`✔ ${cats.length} categories across ${total} channels`)
+    oc.setProgress(100, 'Categories loaded')
+    oc.hideOverlay()
+  } catch (e: any) {
+    catsError.value = e.message || String(e)
+    oc.appendDetail('✖ ' + catsError.value)
+    oc.markError()
+  } finally {
+    loadingCats.value = false
+  }
+}
 
 function selectPreset(value: string) {
   if (form.userAgentPreset === value) {
@@ -196,6 +316,13 @@ onMounted(() => {
   form.epgOffsetHours = d.epgOffsetHours ?? 0
   form.reformatLogos = !!d.reformatLogos
   form.catalogName = (decodedConfig as any).catalogName || ''
+  form.catalogMode = d.catalogMode === 'split' ? 'split' : 'single'
+  if (Array.isArray(d.selectedCategories) && d.selectedCategories.length) {
+    form.selectedCategories = [...d.selectedCategories]
+    categories.value = d.selectedCategories.map(name => ({ name }))
+    knownCategoryNames = new Set(d.selectedCategories)
+    categoriesLoaded.value = true
+  }
   const savedUa = d.globalUserAgent || ''
   if (savedUa) {
     const match = USER_AGENT_PRESETS.find(p => p.value === savedUa)
@@ -225,6 +352,15 @@ async function handleInstall() {
     ...(enableEpg && customEpgUrl ? { epgUrl: customEpgUrl } : {}),
     ...(form.catalogName.trim() ? { catalogName: form.catalogName.trim() } : {}),
     ...(form.globalUserAgent.trim() ? { globalUserAgent: form.globalUserAgent.trim() } : {}),
+  }
+
+  // Keep only categories still present in the playlist (when a scan was done).
+  const selected = knownCategoryNames.size
+    ? form.selectedCategories.filter(c => knownCategoryNames.has(c))
+    : form.selectedCategories
+  if (selected.length > 0) {
+    config.selectedCategories = selected
+    config.catalogMode = form.catalogMode
   }
 
   oc.showOverlay(false)

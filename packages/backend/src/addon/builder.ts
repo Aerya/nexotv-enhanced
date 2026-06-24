@@ -11,7 +11,11 @@ async function createAddon(config: AddonConfig) {
 
     const cacheKey = createCacheKey(config);
     const idPrefix = cacheKey.slice(0, 8);
-    const manifest = createManifest(idPrefix, config.catalogName);
+    const manifest = createManifest(idPrefix, {
+        catalogName: config.catalogName,
+        catalogMode: config.catalogMode,
+        selectedCategories: config.selectedCategories,
+    });
     const debugFlag = !!env.DEBUG;
     if (debugFlag) {
         console.log('[DEBUG] createAddon start', { cacheKey, provider: config.provider || 'xtream' });
@@ -49,9 +53,21 @@ async function createAddon(config: AddonConfig) {
             const start = Date.now();
             try {
                 await addonInstance.refreshOnFirstCatalogRequest();
-                const catalogIds = ['iptv_channels', 'iptv_org'];
                 const channels = await addonInstance.getChannelsForCatalog();
-                let items = args.type === 'tv' && catalogIds.includes(args.id) ? channels : [];
+                let items: any[] = [];
+                if (args.type === 'tv') {
+                    const splitCategory = addonInstance.getCategoryForCatalogId(args.id);
+                    if (splitCategory) {
+                        // 'split' mode: a catalog dedicated to one category.
+                        items = channels.filter((c: any) =>
+                            (c.category || c.attributes?.['group-title']) === splitCategory
+                        );
+                    } else if (args.id === 'iptv_channels' || args.id === 'iptv_org') {
+                        // 'single' mode (or legacy): the combined catalog, limited
+                        // to the user's selected categories when they picked a subset.
+                        items = addonInstance.filterBySelectedCategories(channels);
+                    }
+                }
                 const extra = args.extra || {};
                 if (extra.genre && extra.genre !== 'All Channels') {
                     items = items.filter((i: any) =>

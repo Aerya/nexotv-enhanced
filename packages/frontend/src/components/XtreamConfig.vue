@@ -22,6 +22,36 @@
     </fieldset>
 
     <fieldset>
+      <legend>Categories</legend>
+      <div class="info-banner">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 16v-4M12 8h.01"></path>
+        </svg>
+        <span>
+          Load the categories from your panel, then pick the ones you want. Leave it untouched
+          to include <strong>all</strong> categories in a single catalog.
+        </span>
+      </div>
+
+      <div class="form-group">
+        <button type="button" class="btn ghost" :disabled="loadingCats" @click="loadCategories">
+          {{ loadingCats ? 'Loading…' : (categoriesLoaded ? 'Reload categories' : 'Load categories') }}
+        </button>
+        <small v-if="catsError" class="hint warn">{{ catsError }}</small>
+      </div>
+
+      <CategorySelector
+        v-if="categoriesLoaded"
+        v-model="form.selectedCategories"
+        v-model:mode="form.catalogMode"
+        :categories="categories"
+        modeName="xtreamCatalogMode"
+      />
+    </fieldset>
+
+    <fieldset>
       <legend>EPG Options</legend>
       <div class="form-group checkbox-line">
         <input type="checkbox" id="enableEpg" v-model="form.enableEpg">
@@ -88,7 +118,8 @@
 import { reactive, ref, inject, onMounted } from 'vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAddonInfo } from '../composables/useAddonInfo'
-import type { XtreamConfig } from '../types/config'
+import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
+import type { XtreamConfig, CatalogMode } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
 const { info: addonInfo } = useAddonInfo()
@@ -107,7 +138,18 @@ const form = reactive({
   epgOffsetHours: 0,
   reformatLogos: false,
   catalogName: '',
+  selectedCategories: [] as string[],
+  catalogMode: 'single' as CatalogMode,
 })
+
+// Category loading state
+const categories = ref<CategoryEntry[]>([])
+const categoriesLoaded = ref(false)
+const loadingCats = ref(false)
+const catsError = ref('')
+// Cached live-streams list to avoid re-fetching during install (keyed by creds).
+let cachedLiveList: any[] | null = null
+let cachedLiveKey = ''
 
 onMounted(() => {
   const { decodedConfig } = useDecodedToken()
@@ -127,7 +169,80 @@ onMounted(() => {
   form.epgOffsetHours = d.epgOffsetHours ?? 0
   form.reformatLogos = !!d.reformatLogos
   form.catalogName = (decodedConfig as any).catalogName || ''
+  form.catalogMode = d.catalogMode === 'split' ? 'split' : 'single'
+  if (Array.isArray(d.selectedCategories) && d.selectedCategories.length) {
+    form.selectedCategories = [...d.selectedCategories]
+    // Seed the selector with the saved categories so it renders without a reload.
+    categories.value = d.selectedCategories.map(name => ({ name }))
+    categoriesLoaded.value = true
+  }
 })
+
+function credsKey() {
+  return `${normalizeUrl(form.xtreamUrl)}|${form.xtreamUsername.trim()}|${form.xtreamPassword}`
+}
+
+async function fetchLiveList(): Promise<any[]> {
+  const baseUrl = normalizeUrl(form.xtreamUrl)
+  const username = form.xtreamUsername.trim()
+  let password = form.xtreamPassword
+  if (password === '********' && originalPassword) password = originalPassword
+  const base = `${baseUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+  let txt: string
+  try {
+    txt = await robustFetch(`${base}&action=get_live_streams`, 'live_streams', true)
+  } catch {
+    txt = await robustFetch(`${base}&action=get_live_streams`, 'live_streams', false)
+  }
+  let list: any[] = []
+  try { list = JSON.parse(txt) } catch { throw new Error('Failed to parse live streams JSON') }
+  if (!Array.isArray(list)) list = []
+  cachedLiveList = list
+  cachedLiveKey = credsKey()
+  return list
+}
+
+function categoriesFromLiveList(list: any[]): CategoryEntry[] {
+  const counts = new Map<string, number>()
+  for (const l of list) {
+    const c = (l.category_name || l.category || '').toString().trim()
+    if (!c) continue
+    counts.set(c, (counts.get(c) || 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function loadCategories() {
+  const baseUrl = normalizeUrl(form.xtreamUrl)
+  let password = form.xtreamPassword
+  if (password === '********' && originalPassword) password = originalPassword
+  if (!validateUrl(baseUrl)) { catsError.value = 'Enter a valid Base URL first.'; return }
+  if (!form.xtreamUsername.trim() || !password) { catsError.value = 'Username / password required first.'; return }
+
+  catsError.value = ''
+  loadingCats.value = true
+  oc.showOverlay(true)
+  oc.setProgress(10, 'Loading categories')
+  oc.appendDetail('== LOAD CATEGORIES (XTREAM) ==')
+  try {
+    const list = await fetchLiveList()
+    const cats = categoriesFromLiveList(list)
+    if (cats.length === 0) throw new Error('No categories found in this panel.')
+    categories.value = cats
+    categoriesLoaded.value = true
+    oc.appendDetail(`✔ ${cats.length} categories across ${list.length} channels`)
+    oc.setProgress(100, 'Categories loaded')
+    oc.hideOverlay()
+  } catch (e: any) {
+    catsError.value = e.message || String(e)
+    oc.appendDetail('✖ ' + catsError.value)
+    oc.markError()
+  } finally {
+    loadingCats.value = false
+  }
+}
 
 function validateUrl(u: string) {
   try {
@@ -239,28 +354,23 @@ async function handleSubmit() {
   let enableEpgFinal = enableEpgInitial
   try {
     let liveCount = 0
-    const categories = new Set<string>()
+    const categorySet = new Set<string>()
     let epgStats = { programmes: 0, channels: 0 }
 
-    const base = `${baseUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
     oc.setProgress(12, 'Fetching Live Streams')
-    let liveJsonText: string
-    try {
-      liveJsonText = await robustFetch(`${base}&action=get_live_streams`, 'live_streams', true)
-    } catch (lErr: any) {
-      oc.appendDetail(`⚠ Live streams browser fetch failed: ${lErr.message}`)
-      liveJsonText = await robustFetch(`${base}&action=get_live_streams`, 'live_streams', false)
+    let liveList: any[]
+    if (cachedLiveList && cachedLiveKey === credsKey()) {
+      liveList = cachedLiveList
+      oc.appendDetail('✔ Reusing categories already loaded')
+    } else {
+      liveList = await fetchLiveList()
     }
-    let liveList: any[] = []
-    try { liveList = JSON.parse(liveJsonText) } catch { throw new Error('Failed to parse live streams JSON') }
     liveCount = Array.isArray(liveList) ? liveList.length : 0
     oc.appendDetail(`✔ Live streams: ${liveCount.toLocaleString()}`)
 
-    if (Array.isArray(liveList)) {
-      for (const l of liveList) {
-        const c = l.category_name || l.category || ''
-        if (c) categories.add(c)
-      }
+    for (const l of liveList) {
+      const c = l.category_name || l.category || ''
+      if (c) categorySet.add(c)
     }
 
     if (enableEpgInitial) {
@@ -304,9 +414,16 @@ async function handleSubmit() {
     if (enableEpgFinal && epgMode === 'custom' && customEpg) config.epgUrl = customEpg
     if (isFinite(epgOffset) && epgOffset !== 0) config.epgOffsetHours = epgOffset
 
+    // Only keep categories that still exist in the panel.
+    const validSelected = form.selectedCategories.filter(c => categorySet.has(c))
+    if (validSelected.length > 0) {
+      config.selectedCategories = validSelected
+      config.catalogMode = form.catalogMode
+    }
+
     config.prescan = {
       liveCount,
-      categoryCount: categories.size,
+      categoryCount: categorySet.size,
       epgProgrammes: enableEpgFinal ? epgStats.programmes : 0,
       epgChannels: enableEpgFinal ? epgStats.channels : 0,
       mode: 'json',
