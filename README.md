@@ -11,16 +11,11 @@
 
 <p align="center">
   <a href="https://upandclear.org/2026/06/24/nexotv-enhanced/">
-    <img src="https://img.shields.io/badge/Article%20%26%20captures-upandclear.org-blue?style=for-the-badge" alt="Article & captures d'écran">
+    <img src="https://img.shields.io/badge/Article-upandclear.org-blue?style=for-the-badge" alt="Article">
   </a>
 </p>
 
----
-
-## Article & captures d'écran
-
-Présentation détaillée, installation pas à pas et **captures d'écran** (webui + rendu Stremio/Nuvio) :
-**[upandclear.org — NexoTV Enhanced](https://upandclear.org/2026/06/24/nexotv-enhanced/)**
+> Présentation, installation et captures : **[upandclear.org — NexoTV Enhanced](https://upandclear.org/2026/06/24/nexotv-enhanced/)**
 
 ---
 
