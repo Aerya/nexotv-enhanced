@@ -262,7 +262,7 @@ export async function fetchData(addonInstance: any) {
       }
     }
 
-    if (config.enableEpg) {
+    if (config.enableEpg && env.EPG_ENABLED) {
         const customEpgUrl = config.epgUrl && typeof config.epgUrl === 'string' && config.epgUrl.trim() ? config.epgUrl.trim() : null;
         const epgSource = customEpgUrl
             ? customEpgUrl

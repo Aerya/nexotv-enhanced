@@ -97,7 +97,7 @@ export async function fetchData(addonInstance: any) {
         };
     });
 
-    if (config.enableEpg) {
+    if (config.enableEpg && env.EPG_ENABLED) {
         const epgSource = (config.epgUrl && config.epgUrl.trim())
             ? config.epgUrl.trim()
             : detectedEpgUrl;

@@ -212,6 +212,7 @@ services:
 | `CONFIG_SECRET` | Active le chiffrement AES-256-GCM des tokens **et** des configs sauvegardées (≥16 car.) | *(aucun)* |
 | `WEBUI_PASSWORD` | Mot de passe de la webui (vide = UI ouverte) | *(aucun)* |
 | `WEBUI_SESSION_TTL_MS` | Durée de session | `2592000000` (30 j) |
+| `EPG_ENABLED` | Mettre `false` pour **désactiver l'EPG partout** (quel que soit le réglage des configs) | `true` |
 | `UPDATE_INTERVAL_MS` | Intervalle d'auto-refresh des chaînes | `14400000` (4 h) |
 | `EPG_UPDATE_INTERVAL_MS` | Intervalle de refresh EPG | `28800000` (8 h) |
 | `CACHE_TTL_MS` | TTL du cache disque | `86400000` (24 h) |
