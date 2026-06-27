@@ -50,6 +50,9 @@ const env = {
     DATA_MEMORY_TTL_MS: parseInt(process.env.DATA_MEMORY_TTL_MS || '300000', 10),
     UPDATE_INTERVAL_MS: parseInt(process.env.UPDATE_INTERVAL_MS || '14400000', 10),
     MIN_UPDATE_INTERVAL_MS: parseInt(process.env.MIN_UPDATE_INTERVAL_MS || '1800000', 10),
+    // Global EPG kill-switch: when false, no EPG is ever fetched, regardless of
+    // each config's "Enable EPG" setting.
+    EPG_ENABLED: (process.env.EPG_ENABLED || 'true').toLowerCase() !== 'false',
     EPG_UPDATE_INTERVAL_MS: parseInt(process.env.EPG_UPDATE_INTERVAL_MS || '') || 28800000,
     EPG_MAX_BYTES: parseInt(process.env.EPG_MAX_BYTES || '104857600', 10),
     CATALOG_PAGE_SIZE: parseInt(process.env.CATALOG_PAGE_SIZE || '100', 10),
