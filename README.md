@@ -1,5 +1,7 @@
 <h1 align="center">NexoTV-Enhanced</h1>
 
+<p align="center"><strong><a href="README.en.md">🇬🇧 English version</a></strong></p>
+
 <p align="center">
   <strong>Addon Stremio pour IPTV — <em>chaînes TV en direct</em> avant tout, plus catalogues
   Films &amp; Séries, multi-source, sélection des catégories, authentification et configurations
@@ -178,6 +180,9 @@ liste de chaînes courante.
 - **EPG** rafraîchi toutes les **8 h** (`EPG_UPDATE_INTERVAL_MS`).
 - **Xtream VOD + liste des séries** : récupérés dans le même appel que le live (même cadence). Les
   **épisodes** sont chargés à la demande à chaque ouverture de fiche (toujours frais).
+- **Installation non bloquante** : le manifest est servi **immédiatement** et les données sont
+  récupérées **en tâche de fond** → aucun timeout à l'installation, même sur un gros panel ou un EPG
+  volumineux.
 
 La **structure** des catalogues (lesquels, leurs types) est figée par le token : elle ne change qu'en
 **reconfigurant**.

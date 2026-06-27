@@ -43,15 +43,28 @@ async function createAddon(config: AddonConfig) {
         const builder = new addonBuilder(manifest);
         const addonInstance = new M3UEPGAddon(config, manifest);
         await addonInstance.loadChannelsFromCache();
-        try {
-            if (!addonInstance.lastUpdate || (Date.now() - addonInstance.lastUpdate > addonInstance.updateInterval)) {
-                await addonInstance.updateData(true);
-            }
-        } catch (e: any) {
-            console.error('[ADDON] Initial update failed:', e.message);
-        }
         addonInstance.buildGenresInManifest();
-        if (CACHE_ENABLED) addonInstance._evictFromMemory();
+
+        // Non-blocking build: the manifest is served immediately. Data is only
+        // fetched here when it is missing, and even then in the BACKGROUND, so a
+        // large panel (or a heavy EPG) can never make the install request time out.
+        if (addonInstance.channels.length) {
+            // Cache present → serve it; refresh in the background if stale.
+            if (Date.now() - addonInstance.lastUpdate > addonInstance.updateInterval) {
+                addonInstance.updateData(true).catch((e: any) =>
+                    console.error('[ADDON] Background refresh failed:', e.message));
+            }
+            if (CACHE_ENABLED) addonInstance._evictFromMemory();
+        } else {
+            // No cache → fetch in the background (dedup'd with the first catalog
+            // request via refreshOnFirstCatalogRequest, so it runs only once).
+            addonInstance.refreshOnFirstCatalogRequest()
+                .then(() => {
+                    addonInstance.buildGenresInManifest();
+                    if (CACHE_ENABLED) addonInstance._evictFromMemory();
+                })
+                .catch((e: any) => console.error('[ADDON] Background initial fetch failed:', e.message));
+        }
 
         let iface: any;
         const _origBuildGenres = addonInstance.buildGenresInManifest.bind(addonInstance);
