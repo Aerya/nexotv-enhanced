@@ -152,6 +152,8 @@
       </div>
     </fieldset>
 
+    <TmdbKeyField v-model="form.tmdbApiKey" v-model:language="form.tmdbLanguage" />
+
     <fieldset>
       <legend>{{ t('Display', 'Affichage') }}</legend>
       <div class="form-group">
@@ -181,6 +183,7 @@ import { usePublicPlaylists } from '../composables/usePublicPlaylists'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useI18n } from '../composables/useI18n'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
+import TmdbKeyField from './TmdbKeyField.vue'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
 import type { M3uConfig, CatalogMode, CatalogGroup } from '../types/config'
@@ -205,6 +208,8 @@ const form = reactive({
   epgOffsetHours: 0,
   reformatLogos: false,
   catalogName: '',
+  tmdbApiKey: '',
+  tmdbLanguage: 'fr-FR',
   userAgentPreset: '',
   globalUserAgent: '',
   selectedCategories: [] as string[],
@@ -352,6 +357,8 @@ onMounted(() => {
   form.epgOffsetHours = d.epgOffsetHours ?? 0
   form.reformatLogos = !!d.reformatLogos
   form.catalogName = (decodedConfig as any).catalogName || ''
+  form.tmdbApiKey = (d as any).tmdbApiKey || ''
+  form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
   form.catalogMode = d.catalogMode === 'split' ? 'split'
     : d.catalogMode === 'custom' ? 'custom' : 'single'
   if (Array.isArray(d.catalogGroups) && d.catalogGroups.length) {
@@ -425,6 +432,7 @@ function buildConfig(): (M3uConfig & { catalogName?: string }) | null {
     }
     if (Object.keys(categoryTypes).length > 0) config.categoryTypes = categoryTypes
   }
+  if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
   return config
 }
 
@@ -495,6 +503,7 @@ async function handleInstall() {
     }
     if (Object.keys(categoryTypes).length > 0) config.categoryTypes = categoryTypes
   }
+  if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
 
   oc.showOverlay(false)
   oc.setProgress(5, 'Building M3U addon…')

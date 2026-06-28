@@ -31,6 +31,8 @@ export interface MultiConfig {
   catalogGroups?: CatalogGroup[];
   streamSelection?: StreamSelection;
   reformatLogos?: boolean;
+  tmdbApiKey?: string;
+  tmdbLanguage?: string;
 }
 
 export interface XtreamConfig {
@@ -46,6 +48,8 @@ export interface XtreamConfig {
   catalogMode?: CatalogMode;
   catalogGroups?: CatalogGroup[];
   categoryTypes?: Record<string, CategoryType>;
+  tmdbApiKey?: string;
+  tmdbLanguage?: string;
   prescan?: {
     liveCount: number;
     categoryCount: number;
@@ -75,6 +79,8 @@ export interface M3uConfig {
   catalogMode?: CatalogMode;
   catalogGroups?: CatalogGroup[];
   categoryTypes?: Record<string, CategoryType>;
+  tmdbApiKey?: string;
+  tmdbLanguage?: string;
 }
 
 export type AddonConfig = (XtreamConfig | IptvOrgConfig | M3uConfig | MultiConfig) & { catalogName?: string };

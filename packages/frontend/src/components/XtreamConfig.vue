@@ -93,6 +93,8 @@
       </div>
     </fieldset>
 
+    <TmdbKeyField v-model="form.tmdbApiKey" v-model:language="form.tmdbLanguage" />
+
     <fieldset>
       <legend>{{ t('Display', 'Affichage') }}</legend>
       <div class="form-group">
@@ -121,6 +123,7 @@ import { reactive, ref, inject, onMounted } from 'vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAddonInfo } from '../composables/useAddonInfo'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
+import TmdbKeyField from './TmdbKeyField.vue'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
 import { useI18n } from '../composables/useI18n'
@@ -148,6 +151,8 @@ const form = reactive({
   selectedCategories: [] as string[],
   catalogMode: 'single' as CatalogMode,
   catalogGroups: [] as CatalogGroup[],
+  tmdbApiKey: '',
+  tmdbLanguage: 'fr-FR',
 })
 
 // Category loading state
@@ -178,6 +183,8 @@ onMounted(() => {
   form.epgOffsetHours = d.epgOffsetHours ?? 0
   form.reformatLogos = !!d.reformatLogos
   form.catalogName = (decodedConfig as any).catalogName || ''
+  form.tmdbApiKey = (d as any).tmdbApiKey || ''
+  form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
   form.catalogMode = d.catalogMode === 'split' ? 'split'
     : d.catalogMode === 'custom' ? 'custom' : 'single'
   if (Array.isArray(d.catalogGroups) && d.catalogGroups.length) {
@@ -463,6 +470,7 @@ function buildConfig(): XtreamConfig | null {
     for (const name of usedNames) categoryTypes[name] = (typeByName.get(name) as any) || 'tv'
     config.categoryTypes = categoryTypes
   }
+  if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
   return config
 }
 
@@ -604,6 +612,7 @@ async function handleSubmit() {
     }
     config.instanceId = uuid()
     if (form.catalogName.trim()) (config as any).catalogName = form.catalogName.trim()
+    if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
 
     const passHash = await sha256Fragment(password)
     oc.appendDetail(`Password hash fragment: ${passHash}`)

@@ -49,6 +49,7 @@ features on top of the upstream code.
 | **Authentication** | Optional **single password** on the webui. |
 | **Saved configs** | **Server-side saved configurations** (named, reloadable). |
 | **Synopsis** | Movies & series with **synopsis** (genres, cast, director, year) fetched when opening the detail page. |
+| **TMDB enrichment** | TMDB key (entered in the webui) → posters/synopsis/cast **via TMDB** for Movies & Series, with **fallback to provider data** when a title isn't found. |
 | **Language** | **EN / FR** switch in the header (remembered in the browser). |
 | **Display** | Channel logos as square posters; addon name `NexoTV-Enhanced`. |
 
@@ -124,6 +125,19 @@ The catalog type follows the category type: *split* → one catalog per category
 
 > In Stremio/Nuvio, catalogs are grouped **by type**: a Movies catalog appears under
 > *Discover → Movies*, a Series catalog under *Discover → Series*.
+
+### TMDB enrichment (movies & series)
+
+Enter a **TMDB API key** in the webui (*Metadata (TMDB)* section) to fetch **rich metadata**
+(poster, synopsis, genres, cast, rating) on Movie & Series detail pages.
+
+- Prefers the panel's **`tmdb_id`** (exact match); otherwise **TMDB search by title + year**.
+- **Always falls back**: if TMDB finds nothing (messy naming, content not on TMDB…), the **provider
+  data is kept** → nothing is lost.
+- Configurable language (FR/EN). TMDB responses are cached (~7 days).
+- Optional: without a key, behaviour is unchanged (provider metadata).
+
+> The key can also be set globally on the server via `TMDB_API_KEY` (the webui key takes priority).
 
 ### Authentication (single password)
 
@@ -210,6 +224,8 @@ services:
 | `CONFIG_SECRET` | Enables AES-256-GCM encryption of tokens **and** saved configs (≥16 chars) | *(none)* |
 | `WEBUI_PASSWORD` | Webui password (empty = open UI) | *(none)* |
 | `WEBUI_SESSION_TTL_MS` | Session lifetime | `2592000000` (30 d) |
+| `TMDB_API_KEY` | **Global** TMDB fallback key (the webui key takes priority) | *(none)* |
+| `TMDB_LANGUAGE` | Default TMDB language | `fr-FR` |
 | `EPG_ENABLED` | Set to `false` to **disable EPG everywhere** (whatever each config's setting) | `true` |
 | `UPDATE_INTERVAL_MS` | Channel auto-refresh interval | `14400000` (4 h) |
 | `EPG_UPDATE_INTERVAL_MS` | EPG refresh interval | `28800000` (8 h) |
