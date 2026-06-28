@@ -8,6 +8,7 @@ import * as xtreamProvider from '../providers/xtreamProvider';
 import * as iptvOrgProvider from '../providers/iptvOrgProvider';
 import * as m3uProvider from '../providers/m3uProvider';
 import * as multiSourceProvider from '../providers/multiSourceProvider';
+import * as stalkerProvider from '../providers/stalkerProvider';
 import * as tmdb from '../utils/tmdb';
 import { titleHash, normalizeTitle } from './dedup';
 
@@ -25,6 +26,7 @@ const PROVIDER_MAP: Record<string, { fetchData: (addon: any) => Promise<void> }>
     'xtream': xtreamProvider,
     'iptv-org': iptvOrgProvider,
     'm3u': m3uProvider,
+    'stalker': stalkerProvider,
     'multi': multiSourceProvider,
 };
 
@@ -34,6 +36,8 @@ export interface AddonConfig {
     xtreamUsername?: string;
     xtreamPassword?: string;
     m3uUrl?: string;
+    stalkerUrl?: string;
+    stalkerMac?: string;
     epgUrl?: string;
     enableEpg?: boolean;
     epgOffsetHours?: number | string;
@@ -72,11 +76,13 @@ export interface AddonConfig {
 export interface SourceConfig {
     id: string;
     name: string;
-    provider: 'xtream' | 'm3u';
+    provider: 'xtream' | 'm3u' | 'stalker';
     xtreamUrl?: string;
     xtreamUsername?: string;
     xtreamPassword?: string;
     m3uUrl?: string;
+    stalkerUrl?: string;
+    stalkerMac?: string;
     globalUserAgent?: string;
     enableEpg?: boolean;
     epgUrl?: string;
@@ -146,6 +152,8 @@ export function createCacheKey(config: AddonConfig) {
                 xtreamUrl: s.xtreamUrl || null,
                 xtreamUsername: s.xtreamUsername || null,
                 m3uUrl: s.m3uUrl || null,
+                stalkerUrl: s.stalkerUrl || null,
+                stalkerMac: s.stalkerMac || null,
                 enableEpg: !!s.enableEpg,
                 epgUrl: s.epgUrl || null,
                 selectedCategories: [...new Set((s.selectedCategories || [])
@@ -158,7 +166,14 @@ export function createCacheKey(config: AddonConfig) {
 
     const provider = config.provider || 'xtream';
     let minimal: any;
-    if (provider === 'iptv-org') {
+    if (provider === 'stalker') {
+        minimal = {
+            provider,
+            stalkerUrl: config.stalkerUrl || null,
+            stalkerMac: config.stalkerMac || null,
+            ...normalizeSelection(config),
+        };
+    } else if (provider === 'iptv-org') {
         minimal = {
             provider,
             iptvOrgCountry: config.iptvOrgCountry || null,
@@ -424,6 +439,25 @@ export class M3UEPGAddon {
         return Object.keys(h).length
             ? { notWebReady: true, proxyHeaders: { request: h } }
             : { notWebReady: true };
+    }
+
+    /** Stalker portal credentials for a channel (multi: from its source). */
+    private stalkerCredsFor(item: any): { url: string; mac: string } | null {
+        if (item?.source?.id) {
+            const s = this.sourceById(item.source.id);
+            return s?.stalkerUrl && s?.stalkerMac ? { url: s.stalkerUrl, mac: s.stalkerMac } : null;
+        }
+        return this.config.stalkerUrl && this.config.stalkerMac
+            ? { url: this.config.stalkerUrl, mac: this.config.stalkerMac }
+            : null;
+    }
+
+    /** Resolve a Stalker channel's playable URL on demand (create_link). */
+    private async stalkerStream(item: any) {
+        const creds = this.stalkerCredsFor(item);
+        if (!creds) return [];
+        const url = await stalkerProvider.resolveLink(creds, item.stalkerCmd).catch(() => null);
+        return url ? [{ url, title: item.source?.name || item.name, behaviorHints: { notWebReady: true } }] : [];
     }
 
     /** Parse a multi-source logical id. */
@@ -721,7 +755,9 @@ export class M3UEPGAddon {
             }
             if (p?.kind === 'tv') {
                 const item = this.channelMap.get(id);
-                return item ? [{ url: item.url, title: item.source?.name || item.name, behaviorHints: this.streamHints(item) }] : [];
+                if (!item) return [];
+                if (item.stalkerCmd) return this.stalkerStream(item);
+                return [{ url: item.url, title: item.source?.name || item.name, behaviorHints: this.streamHints(item) }];
             }
             return [];
         }
@@ -739,6 +775,9 @@ export class M3UEPGAddon {
         await this.ensureDataLoaded();
         const item = this.channelMap.get(id);
         if (!item) return [];
+
+        // Stalker channels need an on-demand create_link to get a playable URL.
+        if (item.stalkerCmd) return this.stalkerStream(item);
 
         // Movies: a single direct file stream (no live HLS variant).
         if (mediaTypeOf(item) === 'movie') {

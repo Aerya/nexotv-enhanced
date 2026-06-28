@@ -39,6 +39,13 @@
               @click="activeTab = 'm3u'">
               M3U / M3U+
             </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'stalker' }"
+              id="tab-stalker" role="tab"
+              :aria-selected="activeTab === 'stalker'"
+              aria-controls="panel-stalker"
+              @click="activeTab = 'stalker'">
+              Stalker
+            </button>
             <button class="tab-btn" :class="{ active: activeTab === 'multi' }"
               id="tab-multi" role="tab"
               :aria-selected="activeTab === 'multi'"
@@ -62,6 +69,11 @@
           <div id="panel-m3u" class="tab-panel" :class="{ active: activeTab === 'm3u' }"
             role="tabpanel" aria-labelledby="tab-m3u">
             <M3uConfig v-if="activeTab === 'm3u'" />
+          </div>
+
+          <div id="panel-stalker" class="tab-panel" :class="{ active: activeTab === 'stalker' }"
+            role="tabpanel" aria-labelledby="tab-stalker">
+            <StalkerConfig v-if="activeTab === 'stalker'" />
           </div>
 
           <div id="panel-multi" class="tab-panel" :class="{ active: activeTab === 'multi' }"
@@ -115,6 +127,7 @@ import SavedConfigs from './components/SavedConfigs.vue'
 import XtreamConfig from './components/XtreamConfig.vue'
 import IptvOrgConfig from './components/IptvOrgConfig.vue'
 import M3uConfig from './components/M3uConfig.vue'
+import StalkerConfig from './components/StalkerConfig.vue'
 import MultiSourceConfig from './components/MultiSourceConfig.vue'
 import { useManifestPoll } from './composables/useManifestPoll'
 import { useConfigToken } from './composables/useConfigToken'

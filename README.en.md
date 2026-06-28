@@ -39,12 +39,13 @@ features on top of the upstream code.
 
 | Area | Addition |
 |---|---|
-| **Live TV channels** | The core: streams your **live TV channels** (Xtream, M3U/M3U+, IPTV-org) in Stremio, with EPG, logos and search. *(upstream foundation, preserved.)* |
+| **Live TV channels** | The core: streams your **live TV channels** (Xtream, M3U/M3U+, IPTV-org, Stalker) in Stremio, with EPG, logos and search. *(upstream foundation, preserved.)* |
 | **Multi-source** | Add **several** Xtream/M3U sources mixed into the same catalogs, with **Movies/Series de-duplication** and per-source stream choice. |
 | **Categories** | The webui loads the feed's categories, **labels them by type** (TV / Movies / Series) and lets you **pick** which ones to keep (filter, all / none / invert). |
 | **Catalogs** | 3 layouts: a single catalog, one per category, or **custom catalogs** (named groups of categories). |
 | **Movies & Series (Xtream)** | Movies/Series categories become **real playable Stremio catalogs** (`movie` / `series`, series with **seasons + episodes**). |
 | **M3U** | `/movie/` entries are exposed as `movie` catalogs (direct playback). |
+| **Stalker** | **Stalker / Ministra** portal (MAC auth) as a **live-TV source** (single **and** multi-source); streams resolved on play via `create_link`. *(Stalker VOD/series coming later.)* |
 | **Search** | Accent/separator-insensitive matching (`tf 1` ≈ `TF1`, `asterix` ≈ `Astérix`). |
 | **Authentication** | Optional **single password** on the webui. |
 | **Saved configs** | **Server-side saved configurations** (named, reloadable). |
@@ -125,6 +126,17 @@ The catalog type follows the category type: *split* → one catalog per category
 
 > In Stremio/Nuvio, catalogs are grouped **by type**: a Movies catalog appears under
 > *Discover → Movies*, a Series catalog under *Discover → Series*.
+
+### Stalker / Ministra (live TV)
+
+**Stalker** tab (and a **Stalker** option in multi-source): enter the **portal URL** and **MAC
+address**, click **Load categories**, then select and build catalogs like any other provider.
+
+- **Handshake + token** authentication (MAC), `/c/portal.php` path auto-detected.
+- Categories = portal **ITV genres**; channels paginated via `get_ordered_list`.
+- Stalker stream URLs are **dynamic**, so they are resolved **on play** via `create_link`
+  (ephemeral play token).
+- **Live TV only** for now (Stalker VOD/series exists but isn't handled yet).
 
 ### TMDB enrichment (movies & series)
 

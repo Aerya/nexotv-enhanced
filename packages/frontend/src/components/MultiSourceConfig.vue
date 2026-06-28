@@ -19,6 +19,7 @@
         <select v-model="s.provider" class="src-provider">
           <option value="xtream">Xtream</option>
           <option value="m3u">M3U</option>
+          <option value="stalker">Stalker</option>
         </select>
         <button type="button" class="btn tiny ghost danger" @click="removeSource(si)">{{ t('Remove', 'Retirer') }}</button>
       </div>
@@ -29,9 +30,15 @@
         <div class="form-group"><label>{{ t('Username', 'Identifiant') }}</label><input type="text" v-model="s.xtreamUsername"></div>
         <div class="form-group"><label>{{ t('Password', 'Mot de passe') }}</label><input type="password" v-model="s.xtreamPassword"></div>
       </template>
-      <template v-else>
+      <template v-else-if="s.provider === 'm3u'">
         <div class="form-group"><label>{{ t('Playlist URL', 'URL de la playlist') }}</label>
           <input type="url" v-model="s.m3uUrl" placeholder="http://provider/get.php?...type=m3u_plus"></div>
+      </template>
+      <template v-else>
+        <div class="form-group"><label>{{ t('Portal URL', 'URL du portail') }}</label>
+          <input type="url" v-model="s.stalkerUrl" placeholder="http://portal.example.com"></div>
+        <div class="form-group"><label>{{ t('MAC address', 'Adresse MAC') }}</label>
+          <input type="text" v-model="s.stalkerMac" placeholder="00:1A:79:XX:XX:XX"></div>
       </template>
 
       <div class="form-group">
@@ -121,9 +128,10 @@ const { t } = useI18n()
 
 interface Entry { name: string; count?: number; type?: CategoryType }
 interface SourceState {
-  id: string; name: string; provider: 'xtream' | 'm3u'
+  id: string; name: string; provider: 'xtream' | 'm3u' | 'stalker'
   xtreamUrl: string; xtreamUsername: string; xtreamPassword: string
   m3uUrl: string
+  stalkerUrl: string; stalkerMac: string
   categories: Entry[]; selected: string[]
   loaded: boolean; loading: boolean; error: string; filter: string
 }
@@ -133,6 +141,7 @@ function blankSource(): SourceState {
   return {
     id: 's' + (++counter), name: '', provider: 'xtream',
     xtreamUrl: '', xtreamUsername: '', xtreamPassword: '', m3uUrl: '',
+    stalkerUrl: '', stalkerMac: '',
     categories: [], selected: [], loaded: false, loading: false, error: '', filter: '',
   }
 }
@@ -257,14 +266,28 @@ async function loadM3u(s: SourceState): Promise<Entry[]> {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
+async function loadStalker(s: SourceState): Promise<Entry[]> {
+  const r = await fetch('/api/stalker/categories', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: s.stalkerUrl.trim(), mac: s.stalkerMac.trim() }),
+  })
+  if (r.status === 401) { useAuth().markUnauthenticated(); throw new Error(t('Session expired — sign in again.', 'Session expirée — reconnecte-toi.')) }
+  const p = await r.json().catch(() => ({}))
+  if (!r.ok || !Array.isArray(p.categories)) throw new Error(p.error || `HTTP ${r.status}`)
+  return p.categories
+}
+
 async function loadSource(s: SourceState) {
   s.error = ''
   if (s.provider === 'xtream' && (!s.xtreamUrl || !s.xtreamUsername || !s.xtreamPassword)) { s.error = t('URL / credentials required.', 'URL / identifiants requis.'); return }
   if (s.provider === 'm3u' && !s.m3uUrl) { s.error = t('Playlist URL required.', 'URL de playlist requise.'); return }
+  if (s.provider === 'stalker' && (!s.stalkerUrl || !s.stalkerMac)) { s.error = t('Portal URL and MAC required.', 'URL du portail et MAC requis.'); return }
   s.loading = true
   oc.showOverlay(true); oc.setProgress(10, 'Loading categories'); oc.appendDetail(`== ${s.name || s.id} ==`)
   try {
-    const entries = s.provider === 'xtream' ? await loadXtream(s) : await loadM3u(s)
+    const entries = s.provider === 'xtream' ? await loadXtream(s)
+      : s.provider === 'm3u' ? await loadM3u(s)
+        : await loadStalker(s)
     if (!entries.length) throw new Error(t('No category found.', 'Aucune catégorie trouvée.'))
     s.categories = entries; s.loaded = true
     oc.appendDetail(`✔ ${entries.length} catégories`); oc.setProgress(100, 'OK'); oc.hideOverlay()
@@ -293,8 +316,10 @@ function buildConfig(): (MultiConfig & { catalogName?: string }) | null {
     }
     if (s.provider === 'xtream') {
       src.xtreamUrl = s.xtreamUrl.replace(/\/$/, ''); src.xtreamUsername = s.xtreamUsername.trim(); src.xtreamPassword = s.xtreamPassword
-    } else {
+    } else if (s.provider === 'm3u') {
       src.m3uUrl = s.m3uUrl.trim()
+    } else {
+      src.stalkerUrl = s.stalkerUrl.trim(); src.stalkerMac = s.stalkerMac.trim()
     }
     out.push(src)
   }
@@ -354,11 +379,13 @@ onMounted(() => {
     const st = blankSource()
     st.id = sc.id || st.id
     st.name = sc.name || ''
-    st.provider = sc.provider === 'm3u' ? 'm3u' : 'xtream'
+    st.provider = sc.provider === 'm3u' ? 'm3u' : sc.provider === 'stalker' ? 'stalker' : 'xtream'
     st.xtreamUrl = sc.xtreamUrl || ''
     st.xtreamUsername = sc.xtreamUsername || ''
     st.xtreamPassword = sc.xtreamPassword || ''
     st.m3uUrl = sc.m3uUrl || ''
+    st.stalkerUrl = sc.stalkerUrl || ''
+    st.stalkerMac = sc.stalkerMac || ''
     st.selected = Array.isArray(sc.selectedCategories) ? [...sc.selectedCategories] : []
     const types = sc.categoryTypes || {}
     if (st.selected.length) {

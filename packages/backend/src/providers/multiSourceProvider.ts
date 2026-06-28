@@ -3,6 +3,7 @@
 import { parseM3U } from '../parsers/m3uParser';
 import { validatePublicUrl } from '../utils/validateUrl';
 import { titleHash } from '../addon/dedup';
+import * as stalkerProvider from './stalkerProvider';
 import env from '../config/env';
 
 async function withTimeout(url: string, options: any, ms: number) {
@@ -199,6 +200,12 @@ export async function fetchData(addonInstance: any) {
     const results = await Promise.all(sources.map(async (src) => {
         try {
             if (src.provider === 'm3u') return await fetchM3uSource(src, addonInstance.idPrefix);
+            if (src.provider === 'stalker') {
+                return await stalkerProvider.buildChannels(
+                    { url: src.stalkerUrl, mac: src.stalkerMac },
+                    { idPrefix: addonInstance.idPrefix, selected: selectionOf(src).selected, source: srcTag(src) }
+                );
+            }
             return await fetchXtreamSource(src, addonInstance.idPrefix, addonInstance.log);
         } catch (e: any) {
             addonInstance.log?.warn?.('[MULTI] Source failed', src?.name, e?.message);

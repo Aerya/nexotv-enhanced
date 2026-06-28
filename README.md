@@ -40,12 +40,13 @@ fonctionnalités au-dessus du code amont.
 
 | Domaine | Ajout |
 |---|---|
-| **Chaînes TV (live)** | Le cœur : diffuse vos **chaînes TV en direct** (Xtream, M3U/M3U+, IPTV-org) dans Stremio, avec EPG, logos et recherche. *(socle hérité de l'amont, conservé.)* |
+| **Chaînes TV (live)** | Le cœur : diffuse vos **chaînes TV en direct** (Xtream, M3U/M3U+, IPTV-org, Stalker) dans Stremio, avec EPG, logos et recherche. *(socle hérité de l'amont, conservé.)* |
 | **Multi-source** | Ajouter **plusieurs sources** Xtream/M3U mixées dans les mêmes catalogues, avec **déduplication Films/Séries** et choix du flux à la lecture. |
 | **Catégories** | La webui charge les catégories du flux, les **étiquette par type** (TV / Films / Séries) et permet de **cocher** celles à garder (filtre, tout / aucun / inverser). |
 | **Catalogues** | 3 mises en page : un seul catalogue, un par catégorie, ou des **catalogues personnalisés** (groupes nommés de catégories). |
 | **Films & Séries (Xtream)** | Les catégories Films/Séries deviennent de **vrais catalogues Stremio** `movie` / `series` jouables (séries avec **saisons + épisodes**). |
 | **M3U** | Les entrées `/movie/` sont exposées en catalogues `movie` (lecture directe). |
+| **Stalker** | Portail **Stalker / Ministra** (auth par MAC) en **source TV live** (mono **et** multi-source) ; flux résolus à la lecture via `create_link`. *(VOD/séries Stalker à venir.)* |
 | **Recherche** | Match **insensible aux accents/séparateurs** (`tf 1` ≈ `TF1`, `asterix` ≈ `Astérix`). |
 | **Authentification** | **Mot de passe unique** optionnel sur la webui. |
 | **Sauvegarde** | **Configurations sauvegardées côté serveur** (nommées, rechargeables). |
@@ -127,6 +128,18 @@ séries restent à plat (un M3U ne porte pas d'arborescence saison/épisode).
 
 > Dans Stremio/Nuvio, les catalogues sont rangés **par type** : un catalogue Films apparaît sous
 > *Discover → Movies*, un catalogue Séries sous *Discover → Series*.
+
+### Stalker / Ministra (TV live)
+
+Onglet **Stalker** (et option **Stalker** dans le multi-source) : renseigne l'**URL du portail** et
+l'**adresse MAC**, clique **Charger les catégories**, sélectionne et compose tes catalogues comme
+pour les autres fournisseurs.
+
+- Authentification par **handshake + token** (MAC), chemin `/c/portal.php` auto-détecté.
+- Catégories = **genres ITV** du portail ; chaînes paginées via `get_ordered_list`.
+- Les URLs de flux Stalker étant **dynamiques**, elles sont résolues **à la lecture** via
+  `create_link` (token de lecture éphémère).
+- **TV en direct uniquement** pour l'instant (le VOD/séries Stalker existe mais n'est pas encore géré).
 
 ### Enrichissement TMDB (films & séries)
 

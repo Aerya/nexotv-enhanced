@@ -1,4 +1,4 @@
-export type Provider = 'xtream' | 'iptv-org' | 'm3u' | 'multi';
+export type Provider = 'xtream' | 'iptv-org' | 'm3u' | 'stalker' | 'multi';
 
 export type CatalogMode = 'single' | 'split' | 'custom';
 export type CategoryType = 'tv' | 'movie' | 'series';
@@ -12,13 +12,25 @@ export interface CatalogGroup {
 export interface SourceConfig {
   id: string;
   name: string;
-  provider: 'xtream' | 'm3u';
+  provider: 'xtream' | 'm3u' | 'stalker';
   xtreamUrl?: string;
   xtreamUsername?: string;
   xtreamPassword?: string;
   m3uUrl?: string;
+  stalkerUrl?: string;
+  stalkerMac?: string;
   globalUserAgent?: string;
   selectedCategories?: string[];
+  categoryTypes?: Record<string, CategoryType>;
+}
+
+export interface StalkerConfig {
+  provider: 'stalker';
+  stalkerUrl: string;
+  stalkerMac: string;
+  selectedCategories?: string[];
+  catalogMode?: CatalogMode;
+  catalogGroups?: CatalogGroup[];
   categoryTypes?: Record<string, CategoryType>;
 }
 
@@ -83,7 +95,7 @@ export interface M3uConfig {
   tmdbLanguage?: string;
 }
 
-export type AddonConfig = (XtreamConfig | IptvOrgConfig | M3uConfig | MultiConfig) & { catalogName?: string };
+export type AddonConfig = (XtreamConfig | IptvOrgConfig | M3uConfig | StalkerConfig | MultiConfig) & { catalogName?: string };
 
 export interface AddonInfo {
   name: string;
