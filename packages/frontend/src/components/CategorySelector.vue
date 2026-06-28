@@ -72,6 +72,9 @@
     <!-- custom: catalog groups editor -->
     <template v-else>
       <div class="groups-editor">
+        <small class="hint warn">
+          {{ t('Only categories added to a catalog below appear in Stremio. Selected categories left out of every catalog are not shown.', 'Seules les catégories placées dans un catalogue ci-dessous apparaissent dans Stremio. Les catégories cochées qui ne sont dans aucun catalogue ne sont pas affichées.') }}
+        </small>
         <div v-for="(group, gi) in groups" :key="gi" class="group-card">
           <div class="group-head">
             <input type="text" class="group-name" :value="group.name"
