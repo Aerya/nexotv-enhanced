@@ -90,6 +90,7 @@ export async function fetchVodInfo(config: any, vodId: string) {
         director: info.director || '',
         releaseDate: info.releasedate || info.release_date || info.releaseDate || null,
         rating: info.rating != null ? String(info.rating) : '',
+        tmdbId: info.tmdb_id != null ? String(info.tmdb_id) : (info.tmdb != null ? String(info.tmdb) : null),
     };
 }
 

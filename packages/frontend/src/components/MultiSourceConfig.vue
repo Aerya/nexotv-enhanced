@@ -97,6 +97,8 @@
       </div>
     </fieldset>
 
+    <TmdbKeyField v-model="tmdbApiKey" v-model:language="tmdbLanguage" />
+
     <div class="form-actions">
       <button type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
       <button type="submit" class="btn primary">{{ t('Install Addon', 'Installer l\'addon') }}</button>
@@ -110,6 +112,7 @@ import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
 import CategorySelector from './CategorySelector.vue'
+import TmdbKeyField from './TmdbKeyField.vue'
 import { useI18n } from '../composables/useI18n'
 import type { CategoryType, CatalogMode, StreamSelection, MultiConfig, SourceConfig, CatalogGroup } from '../types/config'
 
@@ -138,6 +141,8 @@ const sources = reactive<SourceState[]>([blankSource()])
 const catalogMode = ref<CatalogMode>('single')
 const streamSelection = ref<StreamSelection>('choose')
 const catalogName = ref('')
+const tmdbApiKey = ref('')
+const tmdbLanguage = ref('fr-FR')
 const globalSelected = ref<string[]>([])
 const catalogGroups = ref<CatalogGroup[]>([])
 
@@ -305,6 +310,7 @@ function buildConfig(): (MultiConfig & { catalogName?: string }) | null {
     streamSelection: streamSelection.value,
     reformatLogos: true,
     ...(catalogName.value.trim() ? { catalogName: catalogName.value.trim() } : {}),
+    ...(tmdbApiKey.value.trim() ? { tmdbApiKey: tmdbApiKey.value.trim(), tmdbLanguage: tmdbLanguage.value } : {}),
   }
 
   if (catalogMode.value === 'custom') {
@@ -368,6 +374,8 @@ onMounted(() => {
   }
   streamSelection.value = d.streamSelection === 'auto' ? 'auto' : 'choose'
   catalogName.value = d.catalogName || ''
+  tmdbApiKey.value = d.tmdbApiKey || ''
+  tmdbLanguage.value = d.tmdbLanguage || 'fr-FR'
 })
 </script>
 

@@ -50,6 +50,7 @@ fonctionnalités au-dessus du code amont.
 | **Authentification** | **Mot de passe unique** optionnel sur la webui. |
 | **Sauvegarde** | **Configurations sauvegardées côté serveur** (nommées, rechargeables). |
 | **Synopsis** | Films & séries avec **synopsis** (genres, casting, réalisateur, année) récupérés à l'ouverture de la fiche. |
+| **Enrichissement TMDB** | Clé TMDB (saisie dans la webui) → jaquettes/synopsis/casting **via TMDB** pour Films & Séries, avec **repli sur les données du fournisseur** si le titre n'est pas trouvé. |
 | **Langue** | Sélecteur **EN / FR** dans l'en-tête (mémorisé dans le navigateur). |
 | **Affichage** | Logos de chaînes en affiches carrées ; nom de l'addon `NexoTV-Enhanced`. |
 
@@ -126,6 +127,20 @@ séries restent à plat (un M3U ne porte pas d'arborescence saison/épisode).
 
 > Dans Stremio/Nuvio, les catalogues sont rangés **par type** : un catalogue Films apparaît sous
 > *Discover → Movies*, un catalogue Séries sous *Discover → Series*.
+
+### Enrichissement TMDB (films & séries)
+
+Renseigne une **clé API TMDB** dans la webui (section *Métadonnées (TMDB)*) pour récupérer de
+**belles métadonnées** (jaquette, synopsis, genres, casting, note) sur les fiches Films & Séries.
+
+- Priorité au **`tmdb_id` fourni par le panel** (match exact) ; sinon **recherche TMDB par titre + année**.
+- **Repli systématique** : si TMDB ne trouve rien (nommage exotique, contenu hors TMDB…), on **garde
+  les données du fournisseur** → rien n'est perdu.
+- Langue configurable (FR/EN). Les réponses TMDB sont mises en cache (~7 j).
+- Clé optionnelle : sans clé, le comportement reste celui d'avant (métadonnées du fournisseur).
+
+> La clé peut aussi être fournie globalement côté serveur via `TMDB_API_KEY` (la clé de la webui
+> a priorité).
 
 ### Authentification (mot de passe unique)
 
@@ -217,6 +232,8 @@ services:
 | `CONFIG_SECRET` | Active le chiffrement AES-256-GCM des tokens **et** des configs sauvegardées (≥16 car.) | *(aucun)* |
 | `WEBUI_PASSWORD` | Mot de passe de la webui (vide = UI ouverte) | *(aucun)* |
 | `WEBUI_SESSION_TTL_MS` | Durée de session | `2592000000` (30 j) |
+| `TMDB_API_KEY` | Clé TMDB **globale** de repli (la clé saisie dans la webui prime) | *(aucune)* |
+| `TMDB_LANGUAGE` | Langue TMDB par défaut | `fr-FR` |
 | `EPG_ENABLED` | Mettre `false` pour **désactiver l'EPG partout** (quel que soit le réglage des configs) | `true` |
 | `UPDATE_INTERVAL_MS` | Intervalle d'auto-refresh des chaînes | `14400000` (4 h) |
 | `EPG_UPDATE_INTERVAL_MS` | Intervalle de refresh EPG | `28800000` (8 h) |

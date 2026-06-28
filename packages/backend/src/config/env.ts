@@ -30,6 +30,9 @@ const env = {
     ADDON_BACKGROUND_URL: process.env.ADDON_BACKGROUND_URL || 'https://raw.githubusercontent.com/joaosavi/nexotv/refs/heads/main/packages/frontend/public/assets/background.png',
     LOGO_CACHE_ENABLED: (process.env.LOGO_CACHE_ENABLED || 'true').toLowerCase() !== 'false',
     CONFIG_SECRET: process.env.CONFIG_SECRET || null,
+    // Optional global TMDB fallback (the per-config key from the webui takes priority).
+    TMDB_API_KEY: process.env.TMDB_API_KEY || null,
+    TMDB_LANGUAGE: process.env.TMDB_LANGUAGE || 'fr-FR',
     // Optional single-password gate for the configuration web UI. When unset,
     // the UI is open (backward compatible). The addon/stream endpoints are
     // never gated (Stremio cannot authenticate).

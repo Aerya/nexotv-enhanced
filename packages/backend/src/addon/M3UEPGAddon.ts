@@ -8,7 +8,8 @@ import * as xtreamProvider from '../providers/xtreamProvider';
 import * as iptvOrgProvider from '../providers/iptvOrgProvider';
 import * as m3uProvider from '../providers/m3uProvider';
 import * as multiSourceProvider from '../providers/multiSourceProvider';
-import { titleHash } from './dedup';
+import * as tmdb from '../utils/tmdb';
+import { titleHash, normalizeTitle } from './dedup';
 
 const CACHE_ENABLED = env.CACHE_ENABLED;
 const CACHE_TTL_MS = env.CACHE_TTL_MS;
@@ -53,6 +54,10 @@ export interface AddonConfig {
     catalogGroups?: Array<{ name: string; categories: string[] }>;
     /** Category name → media type ('tv' | 'movie' | 'series'). Drives VOD/series. */
     categoryTypes?: Record<string, 'tv' | 'movie' | 'series'>;
+    /** TMDB API key (entered in the webui) to enrich movie/series metadata. */
+    tmdbApiKey?: string;
+    /** TMDB language for enriched metadata (e.g. 'fr-FR'). */
+    tmdbLanguage?: string;
     /** Multiple IPTV sources mixed into one set of catalogs. */
     sources?: SourceConfig[];
     /**
@@ -465,13 +470,13 @@ export class M3UEPGAddon {
         const first = seriesChans[0];
         const logoUrl = first ? this.deriveFallbackLogoUrl(first) : undefined;
         const merged = new Map<string, any>();
-        let seriesPlot = '';
+        let firstInfo: any = null;
         for (const sc of seriesChans) {
             const src = this.sourceById(sc.source?.id);
             if (!src || src.provider !== 'xtream') continue;
             try {
                 const { episodes, info } = await xtreamProvider.fetchSeriesEpisodes(src, sc.srcSeriesId);
-                if (!seriesPlot && info?.plot) seriesPlot = info.plot;
+                if (!firstInfo && info) firstInfo = info;
                 for (const ep of episodes) {
                     const k = `${ep.season}_${ep.episode}`;
                     if (!merged.has(k)) merged.set(k, ep);
@@ -489,16 +494,8 @@ export class M3UEPGAddon {
                 ...(ep.overview ? { overview: ep.overview } : {}),
                 ...(ep.released ? { released: ep.released } : {}),
             }));
-        return {
-            id,
-            type: 'series',
-            name: first?.name || 'Series',
-            ...(logoUrl ? { poster: logoUrl, logo: logoUrl, background: logoUrl } : {}),
-            posterShape: 'poster',
-            description: seriesPlot || first?.plot || '',
-            ...(first?.category ? { genres: [first.category] } : {}),
-            videos,
-        };
+        const header = await this.seriesHeader(id, first, firstInfo);
+        return { ...header, videos };
     }
 
     private simpleMeta(item: any, type: 'tv' | 'movie') {
@@ -777,7 +774,7 @@ export class M3UEPGAddon {
         return streams;
     }
 
-    /** Map a get_vod_info result + channel into Stremio meta fields. */
+    /** Map a get_vod_info result + channel into provider-only meta fields. */
     private movieMetaExtras(info: any, item: any) {
         const out: any = {};
         out.description = (info && info.plot) || item.plot || '';
@@ -792,29 +789,57 @@ export class M3UEPGAddon {
         return out;
     }
 
-    async buildMovieMeta(item: any) {
+    /** Effective TMDB key/language (per-config webui key wins over the global env). */
+    private tmdbKey(): string | null { return this.config.tmdbApiKey || env.TMDB_API_KEY || null; }
+    private tmdbLang(): string { return this.config.tmdbLanguage || env.TMDB_LANGUAGE || 'fr-FR'; }
+    private yearOf(date: any): string | undefined {
+        const y = String(date || '').slice(0, 4);
+        return /^\d{4}$/.test(y) ? y : undefined;
+    }
+    private async tmdbEnrich(kind: 'movie' | 'series', opts: { tmdbId?: string; title: string; year?: string }) {
+        const key = this.tmdbKey();
+        if (!key || !opts.title) return null;
+        const fn = kind === 'movie' ? tmdb.enrichMovie : tmdb.enrichSeries;
+        return fn(key, { ...opts, language: this.tmdbLang() }).catch(() => null);
+    }
+
+    /** Build a movie meta: TMDB enrichment when available, provider data as fallback. */
+    private async movieMeta(item: any, info: any) {
         const logoUrl = this.deriveFallbackLogoUrl(item);
+        const base = this.movieMetaExtras(info, item);
+        const tm = await this.tmdbEnrich('movie', {
+            tmdbId: info?.tmdbId, title: normalizeTitle(item.name), year: this.yearOf(info?.releaseDate),
+        });
+        const pick = (a: any, b: any) => (a != null && (!Array.isArray(a) || a.length) ? a : b);
+        return {
+            id: item.id,
+            type: 'movie',
+            name: item.name,
+            poster: tm?.poster || logoUrl,
+            logo: logoUrl,
+            background: tm?.background || logoUrl,
+            posterShape: 'poster',
+            description: pick(tm?.description, base.description) || '',
+            ...(pick(tm?.genres, base.genres) ? { genres: pick(tm?.genres, base.genres) } : {}),
+            ...(pick(tm?.cast, base.cast) ? { cast: pick(tm?.cast, base.cast) } : {}),
+            ...(pick(tm?.director, base.director) ? { director: pick(tm?.director, base.director) } : {}),
+            ...(pick(tm?.releaseInfo, base.releaseInfo) ? { releaseInfo: pick(tm?.releaseInfo, base.releaseInfo) } : {}),
+            ...(pick(tm?.imdbRating, base.imdbRating) ? { imdbRating: pick(tm?.imdbRating, base.imdbRating) } : {}),
+        };
+    }
+
+    async buildMovieMeta(item: any) {
         // The streams list lacks the synopsis — fetch it lazily for Xtream movies.
         let info: any = null;
         const parsed = this.parseId(item.id);
         if (parsed?.kind === 'movie') {
             info = await xtreamProvider.fetchVodInfo(this.config, parsed.value).catch(() => null);
         }
-        return {
-            id: item.id,
-            type: 'movie',
-            name: item.name,
-            poster: logoUrl,
-            logo: logoUrl,
-            background: logoUrl,
-            posterShape: 'poster',
-            ...this.movieMetaExtras(info, item),
-        };
+        return this.movieMeta(item, info);
     }
 
-    /** Multi-source movie meta: synopsis fetched from the first Xtream source. */
+    /** Multi-source movie meta: details fetched from the first Xtream source. */
     private async multiMovieMeta(item: any) {
-        const logoUrl = this.deriveFallbackLogoUrl(item);
         let info: any = null;
         for (const c of this.channels.filter(c => c.id === item.id)) {
             const src = this.sourceById(c.source?.id);
@@ -823,15 +848,33 @@ export class M3UEPGAddon {
                 if (info && info.plot) break;
             }
         }
+        return this.movieMeta(item, info);
+    }
+
+    /** Series-level meta header (without videos): TMDB enrichment + provider fallback. */
+    private async seriesHeader(id: string, item: any, info: any) {
+        const logoUrl = item ? this.deriveFallbackLogoUrl(item) : undefined;
+        const tmdbId = info?.tmdb_id != null ? String(info.tmdb_id)
+            : (info?.tmdb != null ? String(info.tmdb) : undefined);
+        const tm = await this.tmdbEnrich('series', {
+            tmdbId,
+            title: normalizeTitle(item?.name || info?.name || ''),
+            year: this.yearOf(info?.releaseDate || info?.releasedate),
+        });
+        const poster = tm?.poster || logoUrl;
+        const background = tm?.background || logoUrl;
+        const genres = (tm?.genres && tm.genres.length) ? tm.genres : (item?.category ? [item.category] : undefined);
         return {
-            id: item.id,
-            type: 'movie',
-            name: item.name,
-            poster: logoUrl,
-            logo: logoUrl,
-            background: logoUrl,
+            id,
+            type: 'series',
+            name: item?.name || info?.name || 'Series',
+            ...(poster ? { poster, logo: logoUrl, background } : {}),
             posterShape: 'poster',
-            ...this.movieMetaExtras(info, item),
+            description: tm?.description || info?.plot || item?.plot || '',
+            ...(genres ? { genres } : {}),
+            ...(tm?.cast?.length ? { cast: tm.cast } : {}),
+            ...(tm?.releaseInfo ? { releaseInfo: tm.releaseInfo } : {}),
+            ...(tm?.imdbRating ? { imdbRating: tm.imdbRating } : {}),
         };
     }
 
@@ -848,16 +891,8 @@ export class M3UEPGAddon {
             ...(ep.overview ? { overview: ep.overview } : {}),
             ...(ep.released ? { released: ep.released } : {}),
         }));
-        return {
-            id,
-            type: 'series',
-            name: item?.name || info?.name || 'Series',
-            ...(logoUrl ? { poster: logoUrl, logo: logoUrl, background: logoUrl } : {}),
-            posterShape: 'poster',
-            description: info?.plot || item?.plot || '',
-            ...(item?.category ? { genres: [item.category] } : {}),
-            videos,
-        };
+        const header = await this.seriesHeader(id, item, info);
+        return { ...header, videos };
     }
 
     async getDetailedMeta(id: string) {
