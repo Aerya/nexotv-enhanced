@@ -15,6 +15,11 @@ export interface ManifestOptions {
     catalogGroups?: CatalogGroup[];
     /** Category name → media type. Missing entries default to 'tv'. */
     categoryTypes?: Record<string, MediaType>;
+    /**
+     * Catalogs kept OUT of the Stremio home board (still browsable in Discover).
+     * Keys: 'grp:<index>' (custom), 'cat:<name>' (split), 'type:<tv|movie|series>' (single).
+     */
+    discoverOnly?: string[];
 }
 
 /** Catalog id used in "single" mode for live TV (kept stable for back-compat). */
@@ -49,10 +54,26 @@ function dominantType(categories: string[], types?: Record<string, MediaType>): 
     return 'tv';
 }
 
-/** Extra/genre block: adds a genre filter only when there are >1 categories. */
-function catalogExtra(categories: string[]) {
+/**
+ * Extra/genre block.
+ * - A **discover-only** catalog gets a REQUIRED genre → Stremio keeps it off the
+ *   home board but still shows it in Discover (defaults to "All Channels").
+ * - A **home** catalog keeps a non-required genre (only when >1 categories, to
+ *   offer an internal filter) so it appears on the board.
+ */
+function catalogExtra(categories: string[], home: boolean) {
+    const genres = ['All Channels', ...categories];
+    if (!home) {
+        return {
+            extra: [
+                { name: 'genre', isRequired: true, options: genres },
+                { name: 'search', isRequired: false },
+                { name: 'skip' }
+            ],
+            genres
+        };
+    }
     if (categories.length > 1) {
-        const genres = ['All Channels', ...categories];
         return {
             extra: [
                 { name: 'genre', isRequired: false, options: genres },
@@ -62,12 +83,7 @@ function catalogExtra(categories: string[]) {
             genres
         };
     }
-    return {
-        extra: [
-            { name: 'search', isRequired: false },
-            { name: 'skip' }
-        ]
-    };
+    return { extra: [{ name: 'search', isRequired: false }, { name: 'skip' }] };
 }
 
 function buildCatalogs(opts: ManifestOptions) {
@@ -78,6 +94,8 @@ function buildCatalogs(opts: ManifestOptions) {
     const categories = cleanCategories(opts.selectedCategories);
     const types = opts.categoryTypes;
     const baseName = opts.catalogName || env.ADDON_NAME;
+    const discoverOnly = new Set(opts.discoverOnly || []);
+    const isHome = (key: string) => !discoverOnly.has(key);
 
     // Custom mode: one catalog per user-defined group of categories.
     if (mode === 'custom') {
@@ -89,7 +107,7 @@ function buildCatalogs(opts: ManifestOptions) {
                 type: dominantType(g.categories, types),
                 id: groupCatalogIdForIndex(i),
                 name: opts.catalogName ? `${opts.catalogName} · ${g.name}` : g.name,
-                ...catalogExtra(g.categories)
+                ...catalogExtra(g.categories, isHome('grp:' + i))
             }));
         }
         // No valid group → fall through to a single combined catalog.
@@ -101,10 +119,7 @@ function buildCatalogs(opts: ManifestOptions) {
             type: typeOf(cat, types),
             id: catalogIdForIndex(i),
             name: opts.catalogName ? `${opts.catalogName} · ${cat}` : cat,
-            extra: [
-                { name: 'search', isRequired: false },
-                { name: 'skip' }
-            ]
+            ...catalogExtra([cat], isHome('cat:' + cat))
         }));
     }
 
@@ -114,39 +129,30 @@ function buildCatalogs(opts: ManifestOptions) {
     const seriesCats = categories.filter(c => typeOf(c, types) === 'series');
     const catalogs: any[] = [];
 
-    // TV catalog: present when TV categories are selected, or as the default
-    // when nothing is selected at all (genres then filled at runtime). Skipped
-    // when the user picked only Movie/Series categories — avoids an empty row.
-    if (tvCats.length > 0 || categories.length === 0) {
-        const genres = tvCats.length > 0 ? ['All Channels', ...tvCats] : [];
+    // One combined catalog per media type. The genre extra is always present
+    // (runtime-filled for TV); `isRequired` is what keeps a catalog off the home
+    // board when the user marked it as Discover-only.
+    const singleCatalog = (type: MediaType, id: string, name: string, cats: string[]) => {
+        const home = isHome('type:' + type);
+        const genres = cats.length ? ['All Channels', ...cats] : (home ? [] : ['All Channels']);
         catalogs.push({
-            type: 'tv',
-            id: SINGLE_CATALOG_ID,
-            name: baseName,
+            type, id, name,
             extra: [
-                { name: 'genre', isRequired: false, options: genres },
+                { name: 'genre', isRequired: !home, options: genres },
                 { name: 'search', isRequired: false },
                 { name: 'skip' }
             ],
-            genres
+            genres,
         });
+    };
+
+    // TV: present when TV categories are selected, or as the default when nothing
+    // is selected at all. Skipped when only Movie/Series were picked.
+    if (tvCats.length > 0 || categories.length === 0) {
+        singleCatalog('tv', SINGLE_CATALOG_ID, baseName, tvCats);
     }
-    if (movieCats.length > 0) {
-        catalogs.push({
-            type: 'movie',
-            id: 'iptv_movies',
-            name: `${baseName} · Movies`,
-            ...catalogExtra(movieCats)
-        });
-    }
-    if (seriesCats.length > 0) {
-        catalogs.push({
-            type: 'series',
-            id: 'iptv_series',
-            name: `${baseName} · Series`,
-            ...catalogExtra(seriesCats)
-        });
-    }
+    if (movieCats.length > 0) singleCatalog('movie', 'iptv_movies', `${baseName} · Movies`, movieCats);
+    if (seriesCats.length > 0) singleCatalog('series', 'iptv_series', `${baseName} · Series`, seriesCats);
     return catalogs;
 }
 

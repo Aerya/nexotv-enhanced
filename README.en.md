@@ -43,6 +43,7 @@ features on top of the upstream code.
 | **Multi-source** | Add **several** Xtream/M3U sources mixed into the same catalogs, with **Movies/Series de-duplication** and per-source stream choice. |
 | **Categories** | The webui loads the feed's categories, **labels them by type** (TV / Movies / Series) and lets you **pick** which ones to keep (filter, all / none / invert). |
 | **Catalogs** | 3 layouts: a single catalog, one per category, or **custom catalogs** (named groups of categories). |
+| **Home / Discover** | Choose, per catalog, which ones show on the **home** board; the others stay accessible via **Discover**. |
 | **Movies & Series (Xtream)** | Movies/Series categories become **real playable Stremio catalogs** (`movie` / `series`, series with **seasons + episodes**). |
 | **M3U** | `/movie/` entries are exposed as `movie` catalogs (direct playback). |
 | **Stalker** | **Stalker / Ministra** portal (MAC auth) as a **live-TV source** (single **and** multi-source); streams resolved on play via `create_link`. *(Stalker VOD/series coming later.)* |
@@ -108,7 +109,10 @@ features on top of the upstream code.
    - **Single** — all categories in one catalog (categories remain an internal genre filter);
    - **Split** — one catalog per category;
    - **Custom** — named catalogs, each grouping the categories of your choice.
-4. **Install Addon**: the selection is encoded (and **compressed**) into the config token,
+4. **On the home screen** section: tick the catalogs to show on the Stremio **home** board; unticked
+   ones stay accessible via **Discover** only (technically: a required genre → off the board but
+   present in Discover).
+5. **Install Addon**: the selection is encoded (and **compressed**) into the config token,
    encrypted when `CONFIG_SECRET` is set.
 
 ### Movies & Series (Xtream)

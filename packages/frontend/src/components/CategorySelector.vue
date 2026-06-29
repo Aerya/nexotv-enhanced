@@ -28,6 +28,18 @@
       </div>
     </div>
 
+    <!-- On-home chooser: which catalogs show on the Stremio home board -->
+    <div class="form-group" v-if="homeCatalogs.length">
+      <label class="group-label">{{ t('On the home screen', 'Sur l\'accueil') }}</label>
+      <p class="hint">{{ t('Unchecked catalogs stay accessible in Discover only.', 'Les catalogues décochés restent accessibles uniquement dans Découvrir.') }}</p>
+      <div class="home-list">
+        <label v-for="c in homeCatalogs" :key="c.key" class="checkbox-line">
+          <input type="checkbox" :checked="isHomeCat(c.key)" @change="toggleHome(c.key)">
+          <span class="checkbox-label">{{ c.label }}</span>
+        </label>
+      </div>
+    </div>
+
     <!-- Type filter (only when the source exposes more than live TV) -->
     <div v-if="hasTypes" class="type-filter">
       <button v-for="t in typeFilters" :key="t.value" type="button"
@@ -138,6 +150,8 @@ const props = defineProps<{
   modelValue: string[]
   mode: CatalogMode
   groups: CatalogGroup[]
+  /** Catalog keys kept off the home board (Discover only). */
+  discoverOnly?: string[]
   /** unique radio group name so multiple selectors on a page don't clash */
   modeName?: string
 }>()
@@ -146,6 +160,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string[]): void
   (e: 'update:mode', value: CatalogMode): void
   (e: 'update:groups', value: CatalogGroup[]): void
+  (e: 'update:discoverOnly', value: string[]): void
 }>()
 
 const splitWarnThreshold = 25
@@ -162,6 +177,35 @@ const typeFilters = computed(() => [
 const modeName = computed(() => props.modeName || 'catalogMode')
 const selectedSet = computed(() => new Set(props.modelValue))
 const hasTypes = computed(() => props.categories.some(c => c.type && c.type !== 'tv'))
+
+// Catalogs that will be created, for the "on home" chooser.
+const homeCatalogs = computed<Array<{ key: string; label: string }>>(() => {
+  if (props.mode === 'custom') {
+    return props.groups
+      .map((g, i) => ({ i, g }))
+      .filter(x => x.g.name.trim() && x.g.categories.length > 0)
+      .map(x => ({ key: 'grp:' + x.i, label: x.g.name.trim() || `Catalog ${x.i + 1}` }))
+  }
+  if (props.mode === 'split') {
+    return props.modelValue.map(name => ({ key: 'cat:' + name, label: name }))
+  }
+  // single: one catalog per present media type
+  const typeByName = new Map(props.categories.map(c => [c.name, c.type || 'tv']))
+  const present = new Set<string>()
+  for (const n of props.modelValue) present.add((typeByName.get(n) as any) || 'tv')
+  if (!props.modelValue.length) present.add('tv')
+  return (['tv', 'movie', 'series'] as const)
+    .filter(tp => present.has(tp))
+    .map(tp => ({ key: 'type:' + tp, label: typeLabel(tp) }))
+})
+
+const discoverSet = computed(() => new Set(props.discoverOnly || []))
+function isHomeCat(key: string) { return !discoverSet.value.has(key) }
+function toggleHome(key: string) {
+  const set = new Set(props.discoverOnly || [])
+  if (set.has(key)) set.delete(key); else set.add(key)
+  emit('update:discoverOnly', [...set])
+}
 
 function typeLabel(ct?: CategoryType) {
   return ct === 'movie' ? t('Movie', 'Film') : ct === 'series' ? t('Series', 'Série') : 'TV'
@@ -283,6 +327,12 @@ function filteredForGroup(gi: number) {
 .category-selector {
   margin-top: 0.5rem;
 }
+.home-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+}
+.home-list .checkbox-line { margin: 0; }
 .type-filter {
   display: flex;
   flex-wrap: wrap;

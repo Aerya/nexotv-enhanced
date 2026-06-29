@@ -26,6 +26,7 @@ async function createAddon(config: AddonConfig) {
         selectedCategories: config.selectedCategories,
         catalogGroups: config.catalogGroups,
         categoryTypes: config.categoryTypes,
+        discoverOnly: config.discoverOnly,
     });
     const debugFlag = !!env.DEBUG;
     if (debugFlag) {

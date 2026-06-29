@@ -31,6 +31,7 @@ export interface StalkerConfig {
   selectedCategories?: string[];
   catalogMode?: CatalogMode;
   catalogGroups?: CatalogGroup[];
+  discoverOnly?: string[];
   categoryTypes?: Record<string, CategoryType>;
 }
 
@@ -41,6 +42,7 @@ export interface MultiConfig {
   selectedCategories?: string[];
   categoryTypes?: Record<string, CategoryType>;
   catalogGroups?: CatalogGroup[];
+  discoverOnly?: string[];
   streamSelection?: StreamSelection;
   reformatLogos?: boolean;
   tmdbApiKey?: string;
@@ -59,6 +61,7 @@ export interface XtreamConfig {
   selectedCategories?: string[];
   catalogMode?: CatalogMode;
   catalogGroups?: CatalogGroup[];
+  discoverOnly?: string[];
   categoryTypes?: Record<string, CategoryType>;
   tmdbApiKey?: string;
   tmdbLanguage?: string;
@@ -90,6 +93,7 @@ export interface M3uConfig {
   selectedCategories?: string[];
   catalogMode?: CatalogMode;
   catalogGroups?: CatalogGroup[];
+  discoverOnly?: string[];
   categoryTypes?: Record<string, CategoryType>;
   tmdbApiKey?: string;
   tmdbLanguage?: string;

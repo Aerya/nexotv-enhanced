@@ -56,6 +56,8 @@ export interface AddonConfig {
     catalogMode?: 'single' | 'split' | 'custom';
     /** User-defined catalogs, each grouping one or more categories. */
     catalogGroups?: Array<{ name: string; categories: string[] }>;
+    /** Catalogs kept off the home board (Discover only). See manifest ManifestOptions. */
+    discoverOnly?: string[];
     /** Category name → media type ('tv' | 'movie' | 'series'). Drives VOD/series. */
     categoryTypes?: Record<string, 'tv' | 'movie' | 'series'>;
     /** TMDB API key (entered in the webui) to enrich movie/series metadata. */
@@ -131,11 +133,13 @@ function normalizeSelection(config: AddonConfig) {
     for (const name of [...inPlay].sort()) {
         if (srcTypes[name]) types[name] = srcTypes[name];
     }
+    const discoverOnly = [...new Set((config.discoverOnly || []).filter(Boolean))].sort();
     return {
         catalogMode: mode,
         selectedCategories: [...new Set(cats)].sort(),
         catalogGroups: groups,
         categoryTypes: types,
+        discoverOnly,
     };
 }
 

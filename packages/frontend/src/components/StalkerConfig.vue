@@ -35,6 +35,7 @@
         v-model="form.selectedCategories"
         v-model:mode="form.catalogMode"
         v-model:groups="form.catalogGroups"
+        v-model:discoverOnly="form.discoverOnly"
         :categories="categories"
         modeName="stalkerCatalogMode"
       />
@@ -74,6 +75,7 @@ const form = reactive({
   selectedCategories: [] as string[],
   catalogMode: 'single' as CatalogMode,
   catalogGroups: [] as CatalogGroup[],
+  discoverOnly: [] as string[],
 })
 
 const categories = ref<CategoryEntry[]>([])
@@ -116,6 +118,7 @@ function buildConfig(): (StalkerConfig & { catalogName?: string }) | null {
     config.catalogMode = form.catalogMode
   }
   if (form.catalogName.trim()) config.catalogName = form.catalogName.trim()
+  if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
   return config
 }
 
@@ -148,6 +151,7 @@ onMounted(() => {
   form.catalogMode = d.catalogMode === 'split' ? 'split' : d.catalogMode === 'custom' ? 'custom' : 'single'
   if (Array.isArray(d.catalogGroups)) form.catalogGroups = d.catalogGroups.map(g => ({ name: g.name, categories: [...g.categories] }))
   if (Array.isArray(d.selectedCategories)) form.selectedCategories = [...d.selectedCategories]
+  if (Array.isArray((d as any).discoverOnly)) form.discoverOnly = [...(d as any).discoverOnly]
   const seed = new Set<string>(d.selectedCategories || [])
   for (const g of (d.catalogGroups || [])) for (const c of g.categories) seed.add(c)
   if (seed.size) { categories.value = [...seed].sort().map(name => ({ name, type: 'tv' as const })); categoriesLoaded.value = true }
