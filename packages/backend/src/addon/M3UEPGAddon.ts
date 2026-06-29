@@ -464,6 +464,18 @@ export class M3UEPGAddon {
         return url ? [{ url, title: item.source?.name || item.name, behaviorHints: { notWebReady: true } }] : [];
     }
 
+    /** Resolve a Stalker movie's playable URL on demand (create_link, type=vod). */
+    private async resolveStalkerVod(item: any): Promise<string | null> {
+        const creds = this.stalkerCredsFor(item);
+        if (!creds) return null;
+        return stalkerProvider.resolveLink(creds, item.stalkerVodCmd, 'vod').catch(() => null);
+    }
+
+    private async stalkerVodStream(item: any) {
+        const url = await this.resolveStalkerVod(item);
+        return url ? [{ url, title: item.source?.name || item.name, behaviorHints: { notWebReady: true } }] : [];
+    }
+
     /** Parse a multi-source logical id. */
     parseMultiId(id: string): { kind: 'tv' | 'movie' | 'series' | 'episode'; hash?: string; season?: number; episode?: number } | null {
         const prefix = `xc${this.idPrefix}_`;
@@ -755,7 +767,11 @@ export class M3UEPGAddon {
             if (p?.kind === 'movie') {
                 let matches = this.channels.filter(c => c.id === id);
                 if (this.config.streamSelection === 'auto') matches = matches.slice(0, 1);
-                return matches.map(c => ({ url: c.url, title: c.source?.name || c.name, behaviorHints: this.streamHints(c) }));
+                const out = await Promise.all(matches.map(async c => {
+                    const url = c.stalkerVodCmd ? await this.resolveStalkerVod(c) : c.url;
+                    return url ? { url, title: c.source?.name || c.name, behaviorHints: this.streamHints(c) } : null;
+                }));
+                return out.filter(Boolean);
             }
             if (p?.kind === 'tv') {
                 const item = this.channelMap.get(id);
@@ -782,6 +798,7 @@ export class M3UEPGAddon {
 
         // Stalker channels need an on-demand create_link to get a playable URL.
         if (item.stalkerCmd) return this.stalkerStream(item);
+        if (item.stalkerVodCmd) return this.stalkerVodStream(item);
 
         // Movies: a single direct file stream (no live HLS variant).
         if (mediaTypeOf(item) === 'movie') {
@@ -872,6 +889,10 @@ export class M3UEPGAddon {
     }
 
     async buildMovieMeta(item: any) {
+        // Stalker movies carry plot + tmdb_id from the list — no extra fetch needed.
+        if (item.stalkerVodCmd) {
+            return this.movieMeta(item, { plot: item.plot, tmdbId: item.tmdbId });
+        }
         // The streams list lacks the synopsis — fetch it lazily for Xtream movies.
         let info: any = null;
         const parsed = this.parseId(item.id);
@@ -881,10 +902,15 @@ export class M3UEPGAddon {
         return this.movieMeta(item, info);
     }
 
-    /** Multi-source movie meta: details fetched from the first Xtream source. */
+    /** Multi-source movie meta: details from the first source that has them. */
     private async multiMovieMeta(item: any) {
         let info: any = null;
         for (const c of this.channels.filter(c => c.id === item.id)) {
+            if (c.stalkerVodCmd) {
+                if (!info) info = { plot: c.plot, tmdbId: c.tmdbId };
+                if (c.plot || c.tmdbId) { info = { plot: c.plot, tmdbId: c.tmdbId }; break; }
+                continue;
+            }
             const src = this.sourceById(c.source?.id);
             if (src && src.provider === 'xtream' && c.srcVodId) {
                 info = await xtreamProvider.fetchVodInfo(src, c.srcVodId).catch(() => null);

@@ -8,7 +8,7 @@
           <circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path>
         </svg>
         <span>
-          {{ t('Stalker / Ministra portal (MAC authentication). Live TV only for now.', 'Portail Stalker / Ministra (authentification par MAC). TV en direct uniquement pour l\'instant.') }}
+          {{ t('Stalker / Ministra portal (MAC authentication): live TV and movies (VOD).', 'Portail Stalker / Ministra (authentification par MAC) : TV en direct et films (VOD).') }}
         </span>
       </div>
       <div class="form-group">
@@ -42,6 +42,11 @@
     </fieldset>
 
     <fieldset>
+      <legend>{{ t('Metadata', 'Métadonnées') }}</legend>
+      <TmdbKeyField v-model="form.tmdbApiKey" v-model:language="form.tmdbLanguage" />
+    </fieldset>
+
+    <fieldset>
       <legend>{{ t('Display', 'Affichage') }}</legend>
       <div class="form-group">
         <label for="stalkerCatalogName">{{ t('Catalog Name', 'Nom du catalogue') }}</label>
@@ -59,6 +64,7 @@
 <script setup lang="ts">
 import { reactive, ref, inject, onMounted } from 'vue'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
+import TmdbKeyField from './TmdbKeyField.vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
@@ -76,6 +82,8 @@ const form = reactive({
   catalogMode: 'single' as CatalogMode,
   catalogGroups: [] as CatalogGroup[],
   discoverOnly: [] as string[],
+  tmdbApiKey: '',
+  tmdbLanguage: 'fr-FR',
 })
 
 const categories = ref<CategoryEntry[]>([])
@@ -108,15 +116,27 @@ function buildConfig(): (StalkerConfig & { catalogName?: string }) | null {
   const url = form.stalkerUrl.trim(), mac = form.stalkerMac.trim()
   if (!url || !mac) return null
   const config: StalkerConfig & { catalogName?: string } = { provider: 'stalker', stalkerUrl: url, stalkerMac: mac }
+  const usedNames = new Set<string>()
   if (form.catalogMode === 'custom') {
     const groups = form.catalogGroups
       .map(g => ({ name: g.name.trim(), categories: [...g.categories] }))
       .filter(g => g.name && g.categories.length > 0)
-    if (groups.length) { config.catalogMode = 'custom'; config.catalogGroups = groups }
+    if (groups.length) {
+      config.catalogMode = 'custom'; config.catalogGroups = groups
+      for (const g of groups) for (const c of g.categories) usedNames.add(c)
+    }
   } else if (form.selectedCategories.length) {
     config.selectedCategories = [...form.selectedCategories]
     config.catalogMode = form.catalogMode
+    for (const c of form.selectedCategories) usedNames.add(c)
   }
+  if (usedNames.size > 0) {
+    const typeByName = new Map(categories.value.map(c => [c.name, c.type || 'tv']))
+    const categoryTypes: Record<string, 'tv' | 'movie' | 'series'> = {}
+    for (const name of usedNames) categoryTypes[name] = (typeByName.get(name) as any) || 'tv'
+    config.categoryTypes = categoryTypes
+  }
+  if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
   if (form.catalogName.trim()) config.catalogName = form.catalogName.trim()
   if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
   return config
@@ -152,8 +172,14 @@ onMounted(() => {
   if (Array.isArray(d.catalogGroups)) form.catalogGroups = d.catalogGroups.map(g => ({ name: g.name, categories: [...g.categories] }))
   if (Array.isArray(d.selectedCategories)) form.selectedCategories = [...d.selectedCategories]
   if (Array.isArray((d as any).discoverOnly)) form.discoverOnly = [...(d as any).discoverOnly]
+  form.tmdbApiKey = (d as any).tmdbApiKey || ''
+  form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
   const seed = new Set<string>(d.selectedCategories || [])
   for (const g of (d.catalogGroups || [])) for (const c of g.categories) seed.add(c)
-  if (seed.size) { categories.value = [...seed].sort().map(name => ({ name, type: 'tv' as const })); categoriesLoaded.value = true }
+  if (seed.size) {
+    const savedTypes = d.categoryTypes || {}
+    categories.value = [...seed].sort().map(name => ({ name, type: (savedTypes[name] || 'tv') as CategoryEntry['type'] }))
+    categoriesLoaded.value = true
+  }
 })
 </script>

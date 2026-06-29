@@ -9,7 +9,7 @@ import {
 } from '../utils/webauth';
 import { loginLimiter } from '../middleware/rateLimiter';
 import { listConfigs, getConfig, saveConfig, deleteConfig } from '../utils/configStore';
-import { getGenres as stalkerGenres } from '../providers/stalkerProvider';
+import { getCategories as stalkerCategories } from '../providers/stalkerProvider';
 import { validatePublicUrl } from '../utils/validateUrl';
 
 const router = Router();
@@ -64,15 +64,15 @@ router.delete('/api/configs/:id', requireAuth, (req, res) => {
     res.json({ ok: true, removed });
 });
 
-// Stalker portal genres (live-TV categories) for the config UI.
+// Stalker portal categories (live TV + movies, typed) for the config UI.
 router.post('/api/stalker/categories', requireAuth, async (req, res) => {
     const { url, mac } = req.body || {};
     if (!url || !mac) return res.status(400).json({ error: 'Portal URL and MAC required' });
     try {
         await validatePublicUrl(String(url));
-        const genres = await stalkerGenres({ url: String(url), mac: String(mac) });
-        if (!genres.length) return res.status(502).json({ error: 'No categories (check URL/MAC)' });
-        res.json({ categories: genres.map(g => ({ name: g.title, type: 'tv' })) });
+        const categories = await stalkerCategories({ url: String(url), mac: String(mac) });
+        if (!categories.length) return res.status(502).json({ error: 'No categories (check URL/MAC)' });
+        res.json({ categories });
     } catch {
         res.status(502).json({ error: 'Stalker portal unreachable' });
     }

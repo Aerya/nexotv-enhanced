@@ -2,6 +2,7 @@
 
 import { validatePublicUrl } from '../utils/validateUrl';
 import { makeLogger } from '../utils/logger';
+import { titleHash } from '../addon/dedup';
 import env from '../config/env';
 
 const log = makeLogger();
@@ -110,15 +111,52 @@ export async function getGenreChannels(creds: StalkerCreds, genreId: string): Pr
     return out;
 }
 
-/** Resolve a channel `cmd` into a playable URL via create_link. */
-export async function resolveLink(creds: StalkerCreds, cmd: string): Promise<string | null> {
+/** Resolve a `cmd` into a playable URL via create_link (itv for live, vod for movies). */
+export async function resolveLink(creds: StalkerCreds, cmd: string, type: 'itv' | 'vod' = 'itv'): Promise<string | null> {
     if (!cmd) return null;
-    const js = await api(creds, `type=itv&action=create_link&cmd=${encodeURIComponent(cmd)}&forced_storage=0&disable_ad=0`);
+    const js = await api(creds, `type=${type}&action=create_link&cmd=${encodeURIComponent(cmd)}&forced_storage=0&disable_ad=0`);
     let real = js?.cmd;
     if (!real || typeof real !== 'string') return null;
     // Strip player prefixes like "ffmpeg " / "auto " before the URL.
     real = real.replace(/^\s*(ffmpeg|auto|mpegts)\s+/i, '').trim();
     return real || null;
+}
+
+/** VOD (movie) categories. */
+export async function getVodCategories(creds: StalkerCreds): Promise<Array<{ id: string; title: string }>> {
+    const js = await api(creds, 'type=vod&action=get_categories');
+    if (!Array.isArray(js)) return [];
+    return js
+        .filter((c: any) => c && c.id && c.id !== '*' && c.title)
+        .map((c: any) => ({ id: String(c.id), title: String(c.title).trim() }));
+}
+
+/** All movies of a VOD category (handles pagination). */
+export async function getVodList(creds: StalkerCreds, categoryId: string): Promise<any[]> {
+    const out: any[] = [];
+    let page = 1;
+    let pages = 1;
+    do {
+        const js = await api(creds, `type=vod&action=get_ordered_list&category=${encodeURIComponent(categoryId)}&sortby=added&p=${page}`);
+        const data = js?.data;
+        if (!Array.isArray(data)) break;
+        out.push(...data);
+        const total = parseInt(js.total_items, 10) || 0;
+        const per = parseInt(js.max_page_items, 10) || data.length || 1;
+        pages = Math.max(1, Math.ceil(total / per));
+        page++;
+        if (page > 400) break; // hard safety cap
+    } while (page <= pages);
+    return out;
+}
+
+/** Combined categories for the config UI: live TV + movies, each typed. */
+export async function getCategories(creds: StalkerCreds): Promise<Array<{ name: string; type: 'tv' | 'movie' }>> {
+    const [genres, vod] = await Promise.all([getGenres(creds), getVodCategories(creds).catch(() => [])]);
+    const out: Array<{ name: string; type: 'tv' | 'movie' }> = genres.map(g => ({ name: g.title, type: 'tv' as const }));
+    const seen = new Set(out.map(o => o.name));
+    for (const c of vod) if (!seen.has(c.title)) { out.push({ name: c.title, type: 'movie' }); seen.add(c.title); }
+    return out;
 }
 
 function selectedNames(config: any): Set<string> {
@@ -129,16 +167,27 @@ function selectedNames(config: any): Set<string> {
     );
 }
 
-/** Build live-TV channels for a Stalker source (used by mono + multi). */
+/** Build channels for a Stalker source (live TV + movies; used by mono + multi). */
 export async function buildChannels(creds: StalkerCreds, opts: {
-    idPrefix: string; selected: Set<string>; source?: { id: string; name: string };
+    idPrefix: string; selected: Set<string>; types?: Record<string, string>;
+    source?: { id: string; name: string };
 }): Promise<any[]> {
     await validatePublicUrl(creds.url);
-    const genres = await getGenres(creds);
+    const types = opts.types || {};
     const wantAll = opts.selected.size === 0;
+    const movieCats = new Set([...opts.selected].filter(c => types[c] === 'movie'));
+    const [genres, vodCats] = await Promise.all([
+        getGenres(creds),
+        movieCats.size ? getVodCategories(creds).catch(() => []) : Promise.resolve([] as any[]),
+    ]);
     const out: any[] = [];
+
+    // ── Live TV ───────────────────────────────────────────────────────────────
     for (const g of genres) {
-        if (!wantAll && !opts.selected.has(g.title)) continue;
+        if (!wantAll) {
+            if (!opts.selected.has(g.title)) continue;
+            if (types[g.title] === 'movie' || types[g.title] === 'series') continue; // typed non-TV
+        }
         let items: any[] = [];
         try { items = await getGenreChannels(creds, g.id); }
         catch (e: any) { log.warn('[STALKER] genre fetch failed', g.title, e?.message); continue; }
@@ -160,6 +209,33 @@ export async function buildChannels(creds: StalkerCreds, opts: {
             });
         }
     }
+
+    // ── Movies (only for explicitly selected VOD categories) ────────────────────
+    for (const c of vodCats) {
+        if (!movieCats.has(c.title)) continue;
+        let items: any[] = [];
+        try { items = await getVodList(creds, c.id); }
+        catch (e: any) { log.warn('[STALKER] vod fetch failed', c.title, e?.message); continue; }
+        for (const it of items) {
+            if (!it || !it.cmd || !it.name) continue;
+            const idBase = opts.source
+                ? `xc${opts.idPrefix}_mv_${titleHash(it.name)}`
+                : `xc${opts.idPrefix}_v_${it.id}`;
+            out.push({
+                id: idBase,
+                name: opts.source ? `${it.name} (${opts.source.name})` : it.name,
+                type: 'movie',
+                mediaType: 'movie',
+                stalkerVodCmd: it.cmd,
+                ...(it.tmdb_id ? { tmdbId: String(it.tmdb_id) } : {}),
+                plot: it.description || '',
+                logo: it.screenshot_uri || it.pic || '',
+                category: c.title,
+                ...(opts.source ? { source: opts.source } : {}),
+                attributes: { 'group-title': c.title },
+            });
+        }
+    }
     return out;
 }
 
@@ -171,7 +247,11 @@ export async function fetchData(addonInstance: any) {
     addonInstance.epgData = {};
     addonInstance.channels = await buildChannels(
         { url: stalkerUrl, mac: stalkerMac },
-        { idPrefix: addonInstance.idPrefix, selected: selectedNames(addonInstance.config) }
+        {
+            idPrefix: addonInstance.idPrefix,
+            selected: selectedNames(addonInstance.config),
+            types: addonInstance.config.categoryTypes || {},
+        }
     );
     addonInstance.log?.debug?.('Stalker channels built', { count: addonInstance.channels.length });
 }

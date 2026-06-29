@@ -201,9 +201,10 @@ export async function fetchData(addonInstance: any) {
         try {
             if (src.provider === 'm3u') return await fetchM3uSource(src, addonInstance.idPrefix);
             if (src.provider === 'stalker') {
+                const sel = selectionOf(src);
                 return await stalkerProvider.buildChannels(
                     { url: src.stalkerUrl, mac: src.stalkerMac },
-                    { idPrefix: addonInstance.idPrefix, selected: selectionOf(src).selected, source: srcTag(src) }
+                    { idPrefix: addonInstance.idPrefix, selected: sel.selected, types: sel.types, source: srcTag(src) }
                 );
             }
             return await fetchXtreamSource(src, addonInstance.idPrefix, addonInstance.log);
