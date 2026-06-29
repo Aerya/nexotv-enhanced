@@ -37,6 +37,23 @@ function fromSession(): AddonConfig | null {
   }
 }
 
+/** Raw token from a `/<token>/configure` path, or null. */
+export function configureTokenFromPath(): string | null {
+  try {
+    const parts = window.location.pathname.split('/').filter(Boolean)
+    if (parts.length < 2) return null
+    if (!parts[parts.length - 1].startsWith('configure')) return null
+    return parts[parts.length - 2] || null
+  } catch {
+    return null
+  }
+}
+
+/** Drop the cached decode so the next useDecodedToken() re-reads URL + session. */
+export function resetDecodedToken() {
+  cached = null
+}
+
 export function useDecodedToken() {
   if (!cached) {
     let value = fromUrl()

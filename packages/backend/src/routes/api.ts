@@ -2,7 +2,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import env from '../config/env';
-import { encryptConfig } from '../utils/cryptoConfig';
+import { encryptConfig, tryParseConfigToken } from '../utils/cryptoConfig';
 import {
     authEnabled, verifyPassword, createSession, isAuthenticated,
     sessionCookieHeader, requireAuth,
@@ -89,6 +89,20 @@ router.post('/encrypt', requireAuth, (req, res) => {
         res.json({ token });
     } catch {
         res.status(400).json({ error: 'Invalid config payload' });
+    }
+});
+
+// Decode a manifest token back into its config (for restoring the form when
+// reconfiguring from Stremio). Auth-gated: it returns plaintext credentials.
+router.post('/api/decode-token', requireAuth, (req, res) => {
+    const token = (req.body && req.body.token) ? String(req.body.token) : '';
+    if (!token) return res.status(400).json({ error: 'Token required' });
+    try {
+        const config = tryParseConfigToken(token);
+        if (!config || typeof config !== 'object') return res.status(422).json({ error: 'Invalid token' });
+        res.json({ config });
+    } catch {
+        res.status(422).json({ error: 'Cannot decode token' });
     }
 });
 

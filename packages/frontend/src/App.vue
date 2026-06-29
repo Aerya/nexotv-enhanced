@@ -13,7 +13,7 @@
     <main class="main-content">
       <section class="config-section">
         <SavedConfigs />
-        <div class="card configurator-card">
+        <div class="card configurator-card" :key="restoreKey">
           <h2>{{ t('Provider', 'Fournisseur') }}</h2>
 
           <!-- Provider Tabs -->
@@ -119,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, provide, onMounted } from 'vue'
+import { ref, provide, onMounted, watch } from 'vue'
 import TheHeader from './components/TheHeader.vue'
 import TheOverlay from './components/TheOverlay.vue'
 import LoginGate from './components/LoginGate.vue'
@@ -131,7 +131,7 @@ import StalkerConfig from './components/StalkerConfig.vue'
 import MultiSourceConfig from './components/MultiSourceConfig.vue'
 import { useManifestPoll } from './composables/useManifestPoll'
 import { useConfigToken } from './composables/useConfigToken'
-import { useDecodedToken } from './composables/useDecodedToken'
+import { useDecodedToken, resetDecodedToken, configureTokenFromPath, RESTORE_KEY } from './composables/useDecodedToken'
 import { useAuth } from './composables/useAuth'
 import { useI18n } from './composables/useI18n'
 import type { Provider } from './types/config'
@@ -155,18 +155,63 @@ provide('overlayControl', {
 // Active tab state — default to iptv-org
 const activeTab = ref<Provider>('iptv-org')
 
+// Bumped once a reconfigure token is resolved, to remount the active form so it
+// re-reads the restored config.
+const restoreKey = ref(0)
+let reconfigureResolved = false
+
 // Check auth status on load (shows the login gate if required).
 onMounted(() => { auth.recheck() })
 
-// Reconfiguration: switch to the correct tab based on the decoded token
-onMounted(() => {
+/**
+ * Restore the form when arriving on /<token>/configure (Stremio "Configure")
+ * or after loading a saved config. Encrypted/compressed tokens can't be decoded
+ * in the browser, so we ask the server (auth-gated) and hand the result to the
+ * form via sessionStorage. Retried after login if needed.
+ */
+async function resolveReconfigure() {
+  if (reconfigureResolved) return
+  const rawToken = configureTokenFromPath()
+  const hasPending = !!sessionStorage.getItem(RESTORE_KEY)
+  if (!rawToken && !hasPending) { reconfigureResolved = true; return }
+
+  if (rawToken && !hasPending) {
+    resetDecodedToken()
+    if (!useDecodedToken().decodedConfig) {
+      // enc:/compressed token → decode server-side (needs auth).
+      if (!(auth.state.authenticated || !auth.state.enabled)) return // wait for login
+      try {
+        const r = await fetch('/api/decode-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: rawToken }),
+        })
+        if (r.status === 401) return // not authenticated yet — retry after login
+        if (r.ok) {
+          const { config } = await r.json()
+          if (config) sessionStorage.setItem(RESTORE_KEY, JSON.stringify(config))
+        }
+      } catch {
+        return // leave unresolved so a later trigger can retry
+      }
+    }
+  }
+
+  resetDecodedToken()
   const { decodedConfig } = useDecodedToken()
   if (decodedConfig && (decodedConfig as any).sources?.length) {
     activeTab.value = 'multi'
   } else if (decodedConfig && decodedConfig.provider) {
     activeTab.value = decodedConfig.provider as Provider
   }
-})
+  reconfigureResolved = true
+  restoreKey.value++
+}
+
+// Resolve once auth status is known, and again if the user logs in afterwards.
+watch(() => [auth.state.ready, auth.state.authenticated], () => {
+  if (auth.state.ready) resolveReconfigure()
+}, { immediate: true })
 </script>
 
 <style scoped>
