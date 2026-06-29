@@ -333,7 +333,7 @@ describe('stalker series', () => {
   }
 
   it('builds series meta with seasons/episodes as videos', async () => {
-    const meta = await monoStalkerSeries().getDetailedMeta('xcpfx_s_14649');
+    const meta: any = await monoStalkerSeries().getDetailedMeta('xcpfx_s_14649');
     expect(meta.type).toBe('series');
     expect(meta.videos).toHaveLength(3); // 2 + 1
     expect(meta.videos[0]).toMatchObject({ id: 'xcpfx_se_14649_1_1', season: 1, episode: 1 });
