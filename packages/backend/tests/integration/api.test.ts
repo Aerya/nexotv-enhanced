@@ -116,6 +116,23 @@ describe('API routes (without CONFIG_SECRET)', () => {
     });
   });
 
+  describe('GET /api/stats/views', () => {
+    it('returns the viewing-log shape', async () => {
+      const res = await request(app).get('/api/stats/views');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('history');
+      expect(res.body).toHaveProperty('active');
+      expect(res.body).toHaveProperty('total');
+    });
+  });
+
+  describe('POST /api/stats/feed', () => {
+    it('returns 404 for an unknown config id', async () => {
+      const res = await request(app).post('/api/stats/feed').send({ id: 'deadbeef' });
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe('POST /api/prefetch', () => {
     it('returns 400 for missing url', async () => {
       const res = await request(app).post('/api/prefetch').send({});

@@ -11,6 +11,8 @@ import { loginLimiter } from '../middleware/rateLimiter';
 import { listConfigs, getConfig, saveConfig, deleteConfig } from '../utils/configStore';
 import { getCategories as stalkerCategories } from '../providers/stalkerProvider';
 import { validatePublicUrl } from '../utils/validateUrl';
+import * as viewLog from '../utils/viewLog';
+import createAddon from '../addon/builder';
 
 const router = Router();
 
@@ -103,6 +105,48 @@ router.post('/api/decode-token', requireAuth, (req, res) => {
         res.json({ config });
     } catch {
         res.status(422).json({ error: 'Cannot decode token' });
+    }
+});
+
+// ─── Stats ───────────────────────────────────────────────────────────────────
+
+// Viewing log (output): recent + history of stream-list requests.
+router.get('/api/stats/views', requireAuth, (req, res) => {
+    const all = viewLog.list();
+    const now = Date.now();
+    const ACTIVE_MS = 10 * 60 * 1000;
+    const recent = all.filter(e => now - e.ts < ACTIVE_MS);
+    const limit = Math.min(parseInt(String(req.query.limit || '200'), 10) || 200, 1000);
+    res.json({ total: all.length, active: recent.length, recent, history: all.slice(0, limit) });
+});
+
+router.delete('/api/stats/views', requireAuth, (req, res) => {
+    viewLog.clear();
+    res.json({ ok: true });
+});
+
+// Feed stats (input): number of TV/Movie/Series groups for a saved config.
+router.post('/api/stats/feed', requireAuth, async (req, res) => {
+    const id = req.body && req.body.id ? String(req.body.id) : '';
+    const config = id ? getConfig(id) : null;
+    if (!config) return res.status(404).json({ error: 'Config not found' });
+    try {
+        const iface: any = await createAddon(config);
+        const addon = iface.addonInstance;
+        await addon.ensureDataLoaded();
+        const sets: Record<string, Set<string>> = { tv: new Set(), movie: new Set(), series: new Set() };
+        for (const c of addon.channels || []) {
+            const t = c.mediaType || 'tv';
+            const cat = c.category || c.attributes?.['group-title'];
+            if (cat && sets[t]) sets[t].add(String(cat).trim());
+        }
+        res.json({
+            loaded: (addon.channels?.length || 0) > 0,
+            channels: addon.channels?.length || 0,
+            groups: { tv: sets.tv.size, movie: sets.movie.size, series: sets.series.size },
+        });
+    } catch {
+        res.status(500).json({ error: 'Feed stats failed' });
     }
 });
 
