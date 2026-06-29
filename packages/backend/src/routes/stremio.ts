@@ -7,6 +7,7 @@ import createAddon from '../addon/builder';
 import env from '../config/env';
 import { makeLogger } from '../utils/logger';
 import LRUCache from '../utils/lruCache';
+import * as viewLog from '../utils/viewLog';
 
 const log = makeLogger();
 const router = Router();
@@ -99,6 +100,52 @@ router.get('/:token/manifest.json', tokenLimiter, (req: any, res) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.end(JSON.stringify(manifest));
+});
+
+// Lightweight viewing log: record each stream-list request (what/when/IP/source).
+// Fire-and-forget so it never delays the stream response.
+function clientIp(req: any): string {
+    const xff = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    return xff || req.socket?.remoteAddress || '';
+}
+function stalkerMacFor(addon: any, item: any): string {
+    const cfg = addon?.config || {};
+    if (item?.source?.id && Array.isArray(cfg.sources)) {
+        const s = cfg.sources.find((x: any) => x.id === item.source.id);
+        return s?.stalkerMac || '';
+    }
+    return cfg.stalkerMac || '';
+}
+async function logStreamView(req: any) {
+    const m = req.path.match(/^\/stream\/([^/]+)\/(.+?)\.json$/);
+    if (!m) return;
+    const type = m[1];
+    let id = m[2];
+    try { id = decodeURIComponent(id); } catch { /* keep raw */ }
+    const addon = req.addonInterface?.addonInstance;
+    let title = id, source = '', mac = '';
+    if (addon) {
+        try { await addon.ensureDataLoaded(); } catch { /* best effort */ }
+        const item = addon.channelMap?.get(id);
+        if (item) {
+            title = item.name || id;
+            source = item.source?.name || addon.providerName || '';
+            mac = stalkerMacFor(addon, item);
+        } else {
+            source = addon.providerName || '';
+        }
+    }
+    viewLog.record({
+        ts: Date.now(), type, id, title, ip: clientIp(req), source, mac,
+        cfg: addon?.cacheKey ? String(addon.cacheKey).slice(0, 8) : '',
+    });
+}
+
+router.use('/:token', (req: any, _res, next) => {
+    if (req.addonInterface && req.path.startsWith('/stream/')) {
+        logStreamView(req).catch(() => { /* ignore logging errors */ });
+    }
+    next();
 });
 
 router.use('/:token', tokenLimiter, (req: any, res, next) => {

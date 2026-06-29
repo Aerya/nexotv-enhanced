@@ -54,6 +54,7 @@ fonctionnalités au-dessus du code amont.
 | **Sauvegarde** | **Configurations sauvegardées côté serveur** (nommées, rechargeables). |
 | **Synopsis** | Films & séries avec **synopsis** (genres, casting, réalisateur, année) récupérés à l'ouverture de la fiche. |
 | **Enrichissement TMDB** | Clé TMDB (saisie dans la webui) → jaquettes/synopsis/casting **via TMDB** pour Films & Séries, avec **repli sur les données du fournisseur** si le titre n'est pas trouvé. |
+| **Statistiques** | Panneau **Statistiques** : journal de visionnage (heure, titre, IP, source/MAC, « en cours ») et nombre de **groupes TV / Films / Séries** par config. |
 | **Langue** | Sélecteur **EN / FR** dans l'en-tête (mémorisé dans le navigateur). |
 | **Affichage** | Logos de chaînes en affiches carrées ; nom de l'addon `NexoTV-Enhanced`. |
 
@@ -174,6 +175,19 @@ Renseigne une **clé API TMDB** dans la webui (section *Métadonnées (TMDB)*) p
 - **Les endpoints addon/flux restent publics** (Stremio/Nuvio ne s'authentifient pas).
 - Session par **cookie signé HMAC** (HttpOnly, SameSite=Lax, Secure derrière HTTPS), durée 30 j par
   défaut (`WEBUI_SESSION_TTL_MS`), mot de passe comparé à temps constant, `/api/login` rate-limité.
+- Bouton **Déconnexion** dans l'en-tête (à côté du sélecteur EN/FR) quand tu es connecté.
+
+### Statistiques (visionnage & flux)
+
+Panneau **Statistiques** sur la webui (derrière l'authentification) :
+
+- **Visionnage (sortie)** : chaque demande de liens de lecture (`/stream`) est journalisée — **heure,
+  titre, type, IP** du demandeur, **source** et **MAC du portail** (Stalker) utilisés. Compteur
+  **« en cours (10 min) »** + historique. Journal en SQLite (capé à 2000 entrées / 30 j), effaçable.
+  > Limite : l'addon renvoie des **URLs directes** (le lecteur lit chez le fournisseur), il ne voit
+  > donc que l'**ouverture** d'un média — pas la **durée réelle** de visionnage.
+- **Flux d'entrée** : par configuration sauvegardée, le **nombre de groupes** (catégories) **TV /
+  Films / Séries** et le total d'éléments, calculés depuis le cache (sans re-fetch forcé).
 
 ### Configurations sauvegardées (côté serveur)
 

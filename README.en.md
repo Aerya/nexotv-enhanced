@@ -53,6 +53,7 @@ features on top of the upstream code.
 | **Saved configs** | **Server-side saved configurations** (named, reloadable). |
 | **Synopsis** | Movies & series with **synopsis** (genres, cast, director, year) fetched when opening the detail page. |
 | **TMDB enrichment** | TMDB key (entered in the webui) → posters/synopsis/cast **via TMDB** for Movies & Series, with **fallback to provider data** when a title isn't found. |
+| **Statistics** | **Statistics** panel: viewing log (time, title, IP, source/MAC, "active") and the number of **TV / Movies / Series groups** per config. |
 | **Language** | **EN / FR** switch in the header (remembered in the browser). |
 | **Display** | Channel logos as square posters; addon name `NexoTV-Enhanced`. |
 
@@ -171,6 +172,19 @@ Enter a **TMDB API key** in the webui (*Metadata (TMDB)* section) to fetch **ric
 - **Addon/stream endpoints stay public** (Stremio/Nuvio cannot authenticate).
 - Session via a **signed HMAC cookie** (HttpOnly, SameSite=Lax, Secure behind HTTPS), 30-day default
   (`WEBUI_SESSION_TTL_MS`), constant-time password comparison, rate-limited `/api/login`.
+- **Log out** button in the header (next to the EN/FR switch) when signed in.
+
+### Statistics (viewing & feeds)
+
+**Statistics** panel in the webui (behind auth):
+
+- **Viewing (output)**: every stream-list request (`/stream`) is logged — **time, title, type,
+  requester IP**, **source** and **Stalker portal MAC** used. An **"active (10 min)"** counter +
+  history. Stored in SQLite (capped at 2000 entries / 30 days), clearable.
+  > Limitation: the addon returns **direct URLs** (the player streams from the provider), so it only
+  > sees a media being **opened** — not the real **watch duration**.
+- **Incoming feeds**: per saved configuration, the **number of groups** (categories) **TV / Movies /
+  Series** and total items, computed from cache (no forced re-fetch).
 
 ### Saved configurations (server-side)
 

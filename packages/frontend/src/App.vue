@@ -6,10 +6,6 @@
     <LoginGate v-if="auth.state.ready && auth.state.enabled && !auth.state.authenticated" />
 
     <template v-else-if="auth.state.ready">
-    <div v-if="auth.state.enabled" class="logout-bar">
-      <button class="btn tiny ghost" @click="auth.logout()">{{ t('Log out', 'Déconnexion') }}</button>
-    </div>
-
     <main class="main-content">
       <section class="config-section">
         <SavedConfigs />
@@ -81,6 +77,8 @@
             <MultiSourceConfig v-if="activeTab === 'multi'" />
           </div>
         </div>
+
+        <StatsPanel />
       </section>
 
       <section class="about-section">
@@ -124,6 +122,7 @@ import TheHeader from './components/TheHeader.vue'
 import TheOverlay from './components/TheOverlay.vue'
 import LoginGate from './components/LoginGate.vue'
 import SavedConfigs from './components/SavedConfigs.vue'
+import StatsPanel from './components/StatsPanel.vue'
 import XtreamConfig from './components/XtreamConfig.vue'
 import IptvOrgConfig from './components/IptvOrgConfig.vue'
 import M3uConfig from './components/M3uConfig.vue'
@@ -215,11 +214,4 @@ watch(() => [auth.state.ready, auth.state.authenticated], () => {
 </script>
 
 <style scoped>
-.logout-bar {
-  display: flex;
-  justify-content: flex-end;
-  max-width: 960px;
-  margin: 0.5rem auto -0.5rem;
-  padding: 0 1rem;
-}
 </style>
