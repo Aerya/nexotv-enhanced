@@ -96,6 +96,8 @@
 
     <TmdbKeyField v-model="form.tmdbApiKey" v-model:language="form.tmdbLanguage" />
 
+    <RefreshIntervalField v-model="form.refreshHours" />
+
     <fieldset>
       <legend>{{ t('Display', 'Affichage') }}</legend>
       <div class="form-group">
@@ -125,6 +127,7 @@ import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAddonInfo } from '../composables/useAddonInfo'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
 import TmdbKeyField from './TmdbKeyField.vue'
+import RefreshIntervalField from './RefreshIntervalField.vue'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
 import { useI18n } from '../composables/useI18n'
@@ -155,6 +158,7 @@ const form = reactive({
   discoverOnly: [] as string[],
   tmdbApiKey: '',
   tmdbLanguage: 'fr-FR',
+  refreshHours: null as number | null,
 })
 
 // Category loading state
@@ -187,6 +191,7 @@ onMounted(() => {
   form.catalogName = (decodedConfig as any).catalogName || ''
   form.tmdbApiKey = (d as any).tmdbApiKey || ''
   form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
+  form.refreshHours = (d as any).refreshHours ?? null
   form.discoverOnly = Array.isArray((d as any).discoverOnly) ? [...(d as any).discoverOnly] : []
   form.catalogMode = d.catalogMode === 'split' ? 'split'
     : d.catalogMode === 'custom' ? 'custom' : 'single'
@@ -474,6 +479,7 @@ function buildConfig(): XtreamConfig | null {
     config.categoryTypes = categoryTypes
   }
   if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
+  if (form.refreshHours) config.refreshHours = form.refreshHours
   if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
   return config
 }
@@ -617,6 +623,7 @@ async function handleSubmit() {
     config.instanceId = uuid()
     if (form.catalogName.trim()) (config as any).catalogName = form.catalogName.trim()
     if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
+  if (form.refreshHours) config.refreshHours = form.refreshHours
     if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
 
     const passHash = await sha256Fragment(password)

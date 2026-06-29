@@ -155,6 +155,8 @@
 
     <TmdbKeyField v-model="form.tmdbApiKey" v-model:language="form.tmdbLanguage" />
 
+    <RefreshIntervalField v-model="form.refreshHours" />
+
     <fieldset>
       <legend>{{ t('Display', 'Affichage') }}</legend>
       <div class="form-group">
@@ -185,6 +187,7 @@ import { useDecodedToken } from '../composables/useDecodedToken'
 import { useI18n } from '../composables/useI18n'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
 import TmdbKeyField from './TmdbKeyField.vue'
+import RefreshIntervalField from './RefreshIntervalField.vue'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
 import type { M3uConfig, CatalogMode, CatalogGroup } from '../types/config'
@@ -211,6 +214,7 @@ const form = reactive({
   catalogName: '',
   tmdbApiKey: '',
   tmdbLanguage: 'fr-FR',
+  refreshHours: null as number | null,
   userAgentPreset: '',
   globalUserAgent: '',
   selectedCategories: [] as string[],
@@ -360,6 +364,7 @@ onMounted(() => {
   form.reformatLogos = !!d.reformatLogos
   form.catalogName = (decodedConfig as any).catalogName || ''
   form.tmdbApiKey = (d as any).tmdbApiKey || ''
+  form.refreshHours = (d as any).refreshHours ?? null
   form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
   form.discoverOnly = Array.isArray((d as any).discoverOnly) ? [...(d as any).discoverOnly] : []
   form.catalogMode = d.catalogMode === 'split' ? 'split'
@@ -436,6 +441,7 @@ function buildConfig(): (M3uConfig & { catalogName?: string }) | null {
     if (Object.keys(categoryTypes).length > 0) config.categoryTypes = categoryTypes
   }
   if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
+  if (form.refreshHours) config.refreshHours = form.refreshHours
   if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
   return config
 }
@@ -508,6 +514,7 @@ async function handleInstall() {
     if (Object.keys(categoryTypes).length > 0) config.categoryTypes = categoryTypes
   }
   if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
+  if (form.refreshHours) config.refreshHours = form.refreshHours
   if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
 
   oc.showOverlay(false)

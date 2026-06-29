@@ -35,6 +35,7 @@ export interface StalkerConfig {
   categoryTypes?: Record<string, CategoryType>;
   tmdbApiKey?: string;
   tmdbLanguage?: string;
+  refreshHours?: number;
 }
 
 export interface MultiConfig {
@@ -49,6 +50,7 @@ export interface MultiConfig {
   reformatLogos?: boolean;
   tmdbApiKey?: string;
   tmdbLanguage?: string;
+  refreshHours?: number;
 }
 
 export interface XtreamConfig {
@@ -67,6 +69,7 @@ export interface XtreamConfig {
   categoryTypes?: Record<string, CategoryType>;
   tmdbApiKey?: string;
   tmdbLanguage?: string;
+  refreshHours?: number;
   prescan?: {
     liveCount: number;
     categoryCount: number;
@@ -99,6 +102,7 @@ export interface M3uConfig {
   categoryTypes?: Record<string, CategoryType>;
   tmdbApiKey?: string;
   tmdbLanguage?: string;
+  refreshHours?: number;
 }
 
 export type AddonConfig = (XtreamConfig | IptvOrgConfig | M3uConfig | StalkerConfig | MultiConfig) & { catalogName?: string };

@@ -92,6 +92,11 @@ describe('createCacheKey', () => {
     expect(key1).not.toBe(key2);
   });
 
+  it('ignores refreshHours (refresh cadence is not part of data identity)', () => {
+    const base = { provider: 'xtream' as const, xtreamUrl: 'http://a.com', xtreamUsername: 'u' };
+    expect(createCacheKey({ ...base })).toBe(createCacheKey({ ...base, refreshHours: 12 } as any));
+  });
+
   it('strips non-essential fields (e.g., instanceId)', () => {
     const key1 = createCacheKey({
       provider: 'iptv-org',
@@ -264,6 +269,23 @@ describe('multi-source', () => {
     const one = await auto.getStreams('xcpfx_mv_aaa');
     expect(one).toHaveLength(1);
     expect(one[0].url).toBe('u1');
+  });
+});
+
+// ─── per-config auto-refresh interval ────────────────────────────────────────
+
+describe('auto-refresh interval (refreshHours)', () => {
+  it('uses the global default when refreshHours is unset', () => {
+    const a = new M3UEPGAddon({ provider: 'xtream' });
+    expect((a as any).updateInterval).toBe(14400000); // 4h env default in tests
+  });
+  it('honours a valid per-config refreshHours (in ms)', () => {
+    const a = new M3UEPGAddon({ provider: 'xtream', refreshHours: 6 } as any);
+    expect((a as any).updateInterval).toBe(6 * 3600000);
+  });
+  it('clamps out-of-range values into [1h, 720h]', () => {
+    expect((new M3UEPGAddon({ provider: 'xtream', refreshHours: 0 } as any) as any).updateInterval).toBe(14400000); // 0 → invalid → default
+    expect((new M3UEPGAddon({ provider: 'xtream', refreshHours: 5000 } as any) as any).updateInterval).toBe(720 * 3600000);
   });
 });
 

@@ -203,7 +203,8 @@ Enter a **TMDB API key** in the webui (*Metadata (TMDB)* section) to fetch **ric
 Data is fetched on demand then cached; catalogs always reflect the current channel list.
 
 - **Auto-refresh** in the background every **4 h** (`UPDATE_INTERVAL_MS`) while the instance is
-  active (circuit breaker after 3 failures).
+  active (circuit breaker after 3 failures). **Configurable per config in the webui** ("Auto-refresh"
+  field, 1–720 h) — overrides the global value for that config.
 - **Bootstrap**: the 1st catalog request after a (re)build forces a fresh fetch (unless <2 min).
 - **Conditional requests** ETag / `If-Modified-Since` → `304 Not Modified` = no re-processing.
 - **SQLite disk cache ~24 h** (`CACHE_TTL_MS`, `M3U_CACHE_TTL_MS`, `IPTV_ORG_CACHE_TTL_MS`),

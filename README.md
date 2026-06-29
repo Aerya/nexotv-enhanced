@@ -210,7 +210,8 @@ Les données sont récupérées à la demande puis mises en cache ; les catalogu
 liste de chaînes courante.
 
 - **Auto-refresh** en arrière-plan toutes les **4 h** (`UPDATE_INTERVAL_MS`) tant que l'instance est
-  active (disjoncteur après 3 échecs).
+  active (disjoncteur après 3 échecs). **Réglable par configuration dans la webui** (champ « Mise à
+  jour automatique », 1 à 720 h) — surcharge la valeur globale pour cette config.
 - **Bootstrap** : la 1ʳᵉ requête de catalogue après un (re)build force un fetch frais (sauf si <2 min).
 - **Requêtes conditionnelles** ETag / `If-Modified-Since` → `304 Not Modified` = aucun re-traitement.
 - **Cache disque SQLite ~24 h** (`CACHE_TTL_MS`, `M3U_CACHE_TTL_MS`, `IPTV_ORG_CACHE_TTL_MS`),

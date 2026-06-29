@@ -107,6 +107,8 @@
 
     <TmdbKeyField v-model="tmdbApiKey" v-model:language="tmdbLanguage" />
 
+    <RefreshIntervalField v-model="refreshHours" />
+
     <div class="form-actions">
       <button type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
       <button type="submit" class="btn primary">{{ t('Install Addon', 'Installer l\'addon') }}</button>
@@ -121,6 +123,7 @@ import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
 import CategorySelector from './CategorySelector.vue'
 import TmdbKeyField from './TmdbKeyField.vue'
+import RefreshIntervalField from './RefreshIntervalField.vue'
 import { useI18n } from '../composables/useI18n'
 import type { CategoryType, CatalogMode, StreamSelection, MultiConfig, SourceConfig, CatalogGroup } from '../types/config'
 
@@ -153,6 +156,7 @@ const streamSelection = ref<StreamSelection>('choose')
 const catalogName = ref('')
 const tmdbApiKey = ref('')
 const tmdbLanguage = ref('fr-FR')
+const refreshHours = ref<number | null>(null)
 const globalSelected = ref<string[]>([])
 const catalogGroups = ref<CatalogGroup[]>([])
 const discoverOnly = ref<string[]>([])
@@ -339,6 +343,7 @@ function buildConfig(): (MultiConfig & { catalogName?: string }) | null {
     reformatLogos: true,
     ...(catalogName.value.trim() ? { catalogName: catalogName.value.trim() } : {}),
     ...(tmdbApiKey.value.trim() ? { tmdbApiKey: tmdbApiKey.value.trim(), tmdbLanguage: tmdbLanguage.value } : {}),
+    ...(refreshHours.value ? { refreshHours: refreshHours.value } : {}),
     ...(discoverOnly.value.length ? { discoverOnly: [...discoverOnly.value] } : {}),
   }
 
@@ -407,6 +412,7 @@ onMounted(() => {
   catalogName.value = d.catalogName || ''
   tmdbApiKey.value = d.tmdbApiKey || ''
   tmdbLanguage.value = d.tmdbLanguage || 'fr-FR'
+  refreshHours.value = d.refreshHours ?? null
   if (Array.isArray(d.discoverOnly)) discoverOnly.value = [...d.discoverOnly]
 })
 </script>
