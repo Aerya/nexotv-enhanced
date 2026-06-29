@@ -202,4 +202,18 @@ describe('API routes (with CONFIG_SECRET)', () => {
     expect(res.status).toBe(200);
     expect(res.body.encryptionEnabled).toBe(true);
   });
+
+  it('POST /api/decode-token round-trips an encrypted token back to the config', async () => {
+    const config = { provider: 'stalker', stalkerUrl: 'http://portal', stalkerMac: '00:1A:79:00:00:01' };
+    const enc = await request(app).post('/encrypt').send(config);
+    expect(enc.body.token).toMatch(/^enc:/);
+    const res = await request(app).post('/api/decode-token').send({ token: enc.body.token });
+    expect(res.status).toBe(200);
+    expect(res.body.config).toMatchObject(config);
+  });
+
+  it('POST /api/decode-token returns 400 without a token', async () => {
+    const res = await request(app).post('/api/decode-token').send({});
+    expect(res.status).toBe(400);
+  });
 });
