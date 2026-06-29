@@ -330,6 +330,7 @@ function buildConfig(): (MultiConfig & { catalogName?: string }) | null {
   // Top-level catalog layout operates on the merged category pool.
   const poolNames = new Set(mergedCategories.value.map(e => e.name))
   const cfg: MultiConfig & { catalogName?: string } = {
+    provider: 'multi',
     sources: out,
     catalogMode: catalogMode.value,
     selectedCategories: [...mergedSel],

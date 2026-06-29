@@ -68,7 +68,8 @@ export function getConfig(id: string): any | null {
 export function saveConfig(name: string, config: any, id?: string): SavedConfigMeta {
     ensureDb();
     const cleanName = (name || '').toString().trim().slice(0, 80) || 'Untitled';
-    const provider = (config?.provider || 'xtream').toString();
+    // Multi-source configs are identified by their `sources` list, not a provider field.
+    const provider = (config?.provider || (config?.sources?.length ? 'multi' : 'xtream')).toString();
     const realId = id && /^[a-f0-9]{6,32}$/i.test(id) ? id : crypto.randomBytes(8).toString('hex');
     const meta: SavedConfigMeta = { id: realId, name: cleanName, provider, updatedAt: Date.now() };
 

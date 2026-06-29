@@ -39,4 +39,14 @@ describe('configStore', () => {
     const m = saveConfig('   ', { provider: 'xtream' });
     expect(m.name).toBe('Untitled');
   });
+
+  it('infers the multi provider from the sources list', () => {
+    const m = saveConfig('Multi', { sources: [{ id: 's1', provider: 'xtream' }], catalogMode: 'single' });
+    expect(m.provider).toBe('multi');
+    expect(listConfigs().find(c => c.id === m.id)!.provider).toBe('multi');
+  });
+
+  it('keeps an explicit provider over inference', () => {
+    expect(saveConfig('S', { provider: 'stalker', stalkerUrl: 'http://p' }).provider).toBe('stalker');
+  });
 });

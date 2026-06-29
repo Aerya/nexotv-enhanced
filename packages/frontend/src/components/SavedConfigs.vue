@@ -21,11 +21,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, inject, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
 import { useI18n } from '../composables/useI18n'
+import { RESTORE_KEY } from '../composables/useDecodedToken'
 
-const oc = inject<any>('overlayControl')!
 const saved = useSavedConfigs()
 const { t } = useI18n()
 const busy = ref('')
@@ -34,7 +34,13 @@ const error = ref('')
 onMounted(() => { saved.refresh() })
 
 function providerLabel(p: string) {
-  return p === 'm3u' ? 'M3U' : p === 'iptv-org' ? 'IPTV-org' : 'Xtream'
+  switch (p) {
+    case 'm3u': return 'M3U'
+    case 'iptv-org': return 'IPTV-org'
+    case 'stalker': return 'Stalker'
+    case 'multi': return 'Multi'
+    default: return 'Xtream'
+  }
 }
 
 function formatDate(ms: number) {
@@ -45,10 +51,11 @@ async function load(item: { id: string }) {
   error.value = ''
   busy.value = item.id
   try {
+    // Fetch the decrypted config from the server and hand it to the form via
+    // sessionStorage — works regardless of token encryption/compression.
     const config = await saved.get(item.id)
-    const { manifestUrl } = await oc.buildUrls(config)
-    // Reuse the reconfigure route: the SPA restores the form from the token.
-    window.location.href = manifestUrl.replace(/\/manifest\.json$/, '/configure')
+    sessionStorage.setItem(RESTORE_KEY, JSON.stringify(config))
+    window.location.href = '/configure'
   } catch (e: any) {
     error.value = e.message || 'Load failed'
     busy.value = ''
@@ -83,6 +90,8 @@ async function remove(item: { id: string; name: string }) {
 .type-badge.t-xtream { background: rgba(56, 189, 248, 0.18); color: #7dd3fc; }
 .type-badge.t-m3u { background: rgba(251, 191, 36, 0.18); color: #fbbf24; }
 .type-badge.t-iptv-org { background: rgba(167, 139, 250, 0.2); color: #c4b5fd; }
+.type-badge.t-stalker { background: rgba(52, 211, 153, 0.18); color: #6ee7b7; }
+.type-badge.t-multi { background: rgba(244, 114, 182, 0.18); color: #f9a8d4; }
 .btn.tiny.danger { color: #f87171; }
 .hint.warn { color: #fbbf24; }
 </style>
