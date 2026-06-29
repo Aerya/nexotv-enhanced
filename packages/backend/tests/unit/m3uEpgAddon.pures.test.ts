@@ -34,6 +34,13 @@ vi.mock('../../src/providers/xtreamProvider', () => ({
 }));
 vi.mock('../../src/providers/iptvOrgProvider', () => ({ fetchData: vi.fn() }));
 vi.mock('../../src/providers/m3uProvider', () => ({ fetchData: vi.fn() }));
+vi.mock('../../src/providers/stalkerProvider', () => ({
+  fetchData: vi.fn(),
+  buildChannels: vi.fn(),
+  getCategories: vi.fn(),
+  resolveLink: vi.fn(async (_creds: any, _cmd: any, type: string = 'itv') =>
+    type === 'vod' ? 'http://portal/movie/film.mkv?play_token=abc' : 'http://portal/live.ts'),
+}));
 
 vi.mock('../../src/parsers/epgParser', () => ({
   parseEPG: vi.fn(),
@@ -251,6 +258,54 @@ describe('multi-source', () => {
     const one = await auto.getStreams('xcpfx_mv_aaa');
     expect(one).toHaveLength(1);
     expect(one[0].url).toBe('u1');
+  });
+});
+
+// ─── Stalker VOD (movies) ────────────────────────────────────────────────────
+
+describe('stalker VOD', () => {
+  function monoStalkerMovie() {
+    const a = new M3UEPGAddon({
+      provider: 'stalker', stalkerUrl: 'http://portal', stalkerMac: '00:1A:79:00:00:01',
+      catalogMode: 'single', selectedCategories: ['Films'], categoryTypes: { Films: 'movie' },
+    } as any);
+    a.idPrefix = 'pfx';
+    a.channels = [{
+      id: 'xcpfx_v_1452533', name: 'Bob (2025)', type: 'movie', mediaType: 'movie',
+      stalkerVodCmd: 'BASE64CMD', plot: 'Un synopsis.', tmdbId: '1169789', category: 'Films',
+    }];
+    a.channelMap = new Map(a.channels.map((c: any) => [c.id, c]));
+    return a;
+  }
+
+  it('routes a mono Stalker movie to create_link (type=vod)', async () => {
+    const streams = await monoStalkerMovie().getStreams('xcpfx_v_1452533');
+    expect(streams).toHaveLength(1);
+    expect(streams[0].url).toBe('http://portal/movie/film.mkv?play_token=abc');
+  });
+
+  it('builds movie meta from the Stalker item (plot, no extra fetch)', async () => {
+    const meta = await monoStalkerMovie().buildMovieMeta(monoStalkerMovie().channels[0]);
+    expect(meta.type).toBe('movie');
+    expect(meta.description).toBe('Un synopsis.');
+  });
+
+  it('resolves multi-source Stalker movie streams via create_link', async () => {
+    const a = new M3UEPGAddon({
+      sources: [{ id: 's1', name: 'Portail', provider: 'stalker', stalkerUrl: 'http://portal', stalkerMac: '00:1A:79:00:00:01' }],
+      catalogMode: 'single', selectedCategories: ['Films'], categoryTypes: { Films: 'movie' },
+      streamSelection: 'choose',
+    } as any);
+    a.idPrefix = 'pfx';
+    a.channels = [{
+      id: 'xcpfx_mv_aaa', name: 'Bob (2025)', mediaType: 'movie', category: 'Films',
+      source: { id: 's1', name: 'Portail' }, stalkerVodCmd: 'BASE64CMD',
+    }];
+    a.channelMap = new Map(a.channels.map((c: any) => [c.id, c]));
+    const streams = await a.getStreams('xcpfx_mv_aaa');
+    expect(streams).toHaveLength(1);
+    expect(streams[0].url).toBe('http://portal/movie/film.mkv?play_token=abc');
+    expect(streams[0].title).toBe('Portail');
   });
 });
 

@@ -47,7 +47,7 @@ fonctionnalités au-dessus du code amont.
 | **Accueil / Découvrir** | Choisir, par catalogue, lesquels s'affichent sur l'**accueil** ; les autres restent accessibles via **Découvrir**. |
 | **Films & Séries (Xtream)** | Les catégories Films/Séries deviennent de **vrais catalogues Stremio** `movie` / `series` jouables (séries avec **saisons + épisodes**). |
 | **M3U** | Les entrées `/movie/` sont exposées en catalogues `movie` (lecture directe). |
-| **Stalker** | Portail **Stalker / Ministra** (auth par MAC) en **source TV live** (mono **et** multi-source) ; flux résolus à la lecture via `create_link`. *(VOD/séries Stalker à venir.)* |
+| **Stalker** | Portail **Stalker / Ministra** (auth par MAC) en source **TV live + films (VOD)** (mono **et** multi-source) ; films enrichis TMDB et dédupliqués, flux résolus à la lecture via `create_link`. *(Séries Stalker à venir.)* |
 | **Recherche** | Match **insensible aux accents/séparateurs** (`tf 1` ≈ `TF1`, `asterix` ≈ `Astérix`). |
 | **Authentification** | **Mot de passe unique** optionnel sur la webui. |
 | **Sauvegarde** | **Configurations sauvegardées côté serveur** (nommées, rechargeables). |
@@ -133,17 +133,22 @@ séries restent à plat (un M3U ne porte pas d'arborescence saison/épisode).
 > Dans Stremio/Nuvio, les catalogues sont rangés **par type** : un catalogue Films apparaît sous
 > *Discover → Movies*, un catalogue Séries sous *Discover → Series*.
 
-### Stalker / Ministra (TV live)
+### Stalker / Ministra (TV live + films)
 
 Onglet **Stalker** (et option **Stalker** dans le multi-source) : renseigne l'**URL du portail** et
 l'**adresse MAC**, clique **Charger les catégories**, sélectionne et compose tes catalogues comme
-pour les autres fournisseurs.
+pour les autres fournisseurs. La webui indique le **type** de chaque catégorie (TV / Films).
 
 - Authentification par **handshake + token** (MAC), chemin `/c/portal.php` auto-détecté.
-- Catégories = **genres ITV** du portail ; chaînes paginées via `get_ordered_list`.
+- Catégories TV = **genres ITV** ; catégories **Films** = **VOD** du portail ; listes paginées via
+  `get_ordered_list`.
+- Les **films Stalker** sont lisibles : synopsis + `tmdb_id` fournis par le portail, enrichis via
+  **TMDB** (clé saisie sur la webui) avec repli sur les données du portail.
 - Les URLs de flux Stalker étant **dynamiques**, elles sont résolues **à la lecture** via
-  `create_link` (token de lecture éphémère).
-- **TV en direct uniquement** pour l'instant (le VOD/séries Stalker existe mais n'est pas encore géré).
+  `create_link` (TV `type=itv`, films `type=vod` ; token de lecture éphémère).
+- En multi-source, les **films Stalker se dédupliquent** avec les films Xtream/M3U partageant le
+  même titre (plusieurs sources → une fiche, plusieurs liens).
+- **Séries Stalker à venir** (la structure saisons/épisodes du portail sera gérée ensuite).
 
 ### Enrichissement TMDB (films & séries)
 

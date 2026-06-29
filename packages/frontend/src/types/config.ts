@@ -33,6 +33,8 @@ export interface StalkerConfig {
   catalogGroups?: CatalogGroup[];
   discoverOnly?: string[];
   categoryTypes?: Record<string, CategoryType>;
+  tmdbApiKey?: string;
+  tmdbLanguage?: string;
 }
 
 export interface MultiConfig {
