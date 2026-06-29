@@ -78,6 +78,7 @@
         v-model="globalSelected"
         v-model:mode="catalogMode"
         v-model:groups="catalogGroups"
+        v-model:discoverOnly="discoverOnly"
         :categories="mergedCategories"
         modeName="multiCatalogMode"
       />
@@ -154,6 +155,7 @@ const tmdbApiKey = ref('')
 const tmdbLanguage = ref('fr-FR')
 const globalSelected = ref<string[]>([])
 const catalogGroups = ref<CatalogGroup[]>([])
+const discoverOnly = ref<string[]>([])
 
 // Merged category pool = union of every source's selected categories.
 // Type priority on conflicts: movie/series win over tv.
@@ -336,6 +338,7 @@ function buildConfig(): (MultiConfig & { catalogName?: string }) | null {
     reformatLogos: true,
     ...(catalogName.value.trim() ? { catalogName: catalogName.value.trim() } : {}),
     ...(tmdbApiKey.value.trim() ? { tmdbApiKey: tmdbApiKey.value.trim(), tmdbLanguage: tmdbLanguage.value } : {}),
+    ...(discoverOnly.value.length ? { discoverOnly: [...discoverOnly.value] } : {}),
   }
 
   if (catalogMode.value === 'custom') {
@@ -403,6 +406,7 @@ onMounted(() => {
   catalogName.value = d.catalogName || ''
   tmdbApiKey.value = d.tmdbApiKey || ''
   tmdbLanguage.value = d.tmdbLanguage || 'fr-FR'
+  if (Array.isArray(d.discoverOnly)) discoverOnly.value = [...d.discoverOnly]
 })
 </script>
 

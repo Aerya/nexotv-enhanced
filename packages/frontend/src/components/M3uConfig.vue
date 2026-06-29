@@ -70,6 +70,7 @@
         v-model="form.selectedCategories"
         v-model:mode="form.catalogMode"
         v-model:groups="form.catalogGroups"
+        v-model:discoverOnly="form.discoverOnly"
         :categories="categories"
         modeName="m3uCatalogMode"
       />
@@ -215,6 +216,7 @@ const form = reactive({
   selectedCategories: [] as string[],
   catalogMode: 'single' as CatalogMode,
   catalogGroups: [] as CatalogGroup[],
+  discoverOnly: [] as string[],
 })
 
 // Category loading state
@@ -359,6 +361,7 @@ onMounted(() => {
   form.catalogName = (decodedConfig as any).catalogName || ''
   form.tmdbApiKey = (d as any).tmdbApiKey || ''
   form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
+  form.discoverOnly = Array.isArray((d as any).discoverOnly) ? [...(d as any).discoverOnly] : []
   form.catalogMode = d.catalogMode === 'split' ? 'split'
     : d.catalogMode === 'custom' ? 'custom' : 'single'
   if (Array.isArray(d.catalogGroups) && d.catalogGroups.length) {
@@ -433,6 +436,7 @@ function buildConfig(): (M3uConfig & { catalogName?: string }) | null {
     if (Object.keys(categoryTypes).length > 0) config.categoryTypes = categoryTypes
   }
   if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
+  if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
   return config
 }
 
@@ -504,6 +508,7 @@ async function handleInstall() {
     if (Object.keys(categoryTypes).length > 0) config.categoryTypes = categoryTypes
   }
   if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
+  if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
 
   oc.showOverlay(false)
   oc.setProgress(5, 'Building M3U addon…')

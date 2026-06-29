@@ -47,6 +47,7 @@
         v-model="form.selectedCategories"
         v-model:mode="form.catalogMode"
         v-model:groups="form.catalogGroups"
+        v-model:discoverOnly="form.discoverOnly"
         :categories="categories"
         modeName="xtreamCatalogMode"
       />
@@ -151,6 +152,7 @@ const form = reactive({
   selectedCategories: [] as string[],
   catalogMode: 'single' as CatalogMode,
   catalogGroups: [] as CatalogGroup[],
+  discoverOnly: [] as string[],
   tmdbApiKey: '',
   tmdbLanguage: 'fr-FR',
 })
@@ -185,6 +187,7 @@ onMounted(() => {
   form.catalogName = (decodedConfig as any).catalogName || ''
   form.tmdbApiKey = (d as any).tmdbApiKey || ''
   form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
+  form.discoverOnly = Array.isArray((d as any).discoverOnly) ? [...(d as any).discoverOnly] : []
   form.catalogMode = d.catalogMode === 'split' ? 'split'
     : d.catalogMode === 'custom' ? 'custom' : 'single'
   if (Array.isArray(d.catalogGroups) && d.catalogGroups.length) {
@@ -471,6 +474,7 @@ function buildConfig(): XtreamConfig | null {
     config.categoryTypes = categoryTypes
   }
   if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
+  if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
   return config
 }
 
@@ -613,6 +617,7 @@ async function handleSubmit() {
     config.instanceId = uuid()
     if (form.catalogName.trim()) (config as any).catalogName = form.catalogName.trim()
     if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
+    if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
 
     const passHash = await sha256Fragment(password)
     oc.appendDetail(`Password hash fragment: ${passHash}`)

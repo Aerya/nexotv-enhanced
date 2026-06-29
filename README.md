@@ -44,6 +44,7 @@ fonctionnalités au-dessus du code amont.
 | **Multi-source** | Ajouter **plusieurs sources** Xtream/M3U mixées dans les mêmes catalogues, avec **déduplication Films/Séries** et choix du flux à la lecture. |
 | **Catégories** | La webui charge les catégories du flux, les **étiquette par type** (TV / Films / Séries) et permet de **cocher** celles à garder (filtre, tout / aucun / inverser). |
 | **Catalogues** | 3 mises en page : un seul catalogue, un par catégorie, ou des **catalogues personnalisés** (groupes nommés de catégories). |
+| **Accueil / Découvrir** | Choisir, par catalogue, lesquels s'affichent sur l'**accueil** ; les autres restent accessibles via **Découvrir**. |
 | **Films & Séries (Xtream)** | Les catégories Films/Séries deviennent de **vrais catalogues Stremio** `movie` / `series` jouables (séries avec **saisons + épisodes**). |
 | **M3U** | Les entrées `/movie/` sont exposées en catalogues `movie` (lecture directe). |
 | **Stalker** | Portail **Stalker / Ministra** (auth par MAC) en **source TV live** (mono **et** multi-source) ; flux résolus à la lecture via `create_link`. *(VOD/séries Stalker à venir.)* |
@@ -110,7 +111,10 @@ fonctionnalités au-dessus du code amont.
      genre interne) ;
    - **Split** — un catalogue par catégorie ;
    - **Custom** — des catalogues nommés, chacun regroupant les catégories de ton choix.
-4. **Install Addon** : la sélection est encodée (et **compressée**) dans le token de configuration,
+4. Section **Sur l'accueil** : cocher les catalogues à afficher sur l'**accueil** Stremio ; ceux
+   décochés restent accessibles via **Découvrir** uniquement (techniquement : genre requis →
+   hors board mais présent dans Discover).
+5. **Install Addon** : la sélection est encodée (et **compressée**) dans le token de configuration,
    chiffré si `CONFIG_SECRET` est défini.
 
 ### Films & Séries (Xtream)

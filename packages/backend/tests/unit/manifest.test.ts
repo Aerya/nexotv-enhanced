@@ -205,4 +205,42 @@ describe('createManifest', () => {
     const m = createManifest('abc123', { catalogMode: 'single' });
     expect(m.catalogs.map((c: any) => c.id)).toContain('iptv_channels');
   });
+
+  // ── home vs discover-only (required genre keeps a catalog off the board) ──
+  const genreReq = (c: any) => (c.extra.find((e: any) => e.name === 'genre') || {}).isRequired;
+
+  it('split: a discover-only category gets a required genre, others do not', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'split',
+      selectedCategories: ['News', 'Sports'],
+      categoryTypes: { News: 'tv', Sports: 'tv' },
+      discoverOnly: ['cat:Sports'],
+    });
+    const byCat = Object.fromEntries(m.catalogs.map((c: any) => [c.name, c]));
+    expect(genreReq(byCat['News'])).toBeFalsy();
+    expect(genreReq(byCat['Sports'])).toBe(true);
+  });
+
+  it('custom: a discover-only group (grp:index) gets a required genre', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'custom',
+      catalogGroups: [{ name: 'A', categories: ['x', 'y'] }, { name: 'B', categories: ['z', 'w'] }],
+      categoryTypes: { x: 'tv', y: 'tv', z: 'tv', w: 'tv' },
+      discoverOnly: ['grp:1'],
+    });
+    expect(genreReq(m.catalogs[0])).toBe(false);
+    expect(genreReq(m.catalogs[1])).toBe(true);
+  });
+
+  it('single: a discover-only type (type:movie) gets a required genre', () => {
+    const m = createManifest('abc123', {
+      catalogMode: 'single',
+      selectedCategories: ['News', 'Action'],
+      categoryTypes: { News: 'tv', Action: 'movie' },
+      discoverOnly: ['type:movie'],
+    });
+    const byId = Object.fromEntries(m.catalogs.map((c: any) => [c.id, c]));
+    expect(genreReq(byId['iptv_channels'])).toBe(false);
+    expect(genreReq(byId['iptv_movies'])).toBe(true);
+  });
 });
