@@ -41,7 +41,8 @@
     </div>
 
     <!-- Type filter (only when the source exposes more than live TV) -->
-    <div v-if="hasTypes" class="type-filter">
+    <!-- In custom mode the type filter is shown per-catalog instead (see below). -->
+    <div v-if="hasTypes && mode !== 'custom'" class="type-filter">
       <button v-for="t in typeFilters" :key="t.value" type="button"
         class="playlist-chip" :class="{ active: typeFilter === t.value }"
         @click="typeFilter = t.value">
@@ -103,6 +104,13 @@
           </div>
 
           <div v-if="expanded.has(gi)" class="group-picker">
+            <div v-if="hasTypes" class="type-filter">
+              <button v-for="tf in typeFilters" :key="tf.value" type="button"
+                class="playlist-chip" :class="{ active: (groupTypeFilters[gi] || 'all') === tf.value }"
+                @click="groupTypeFilters[gi] = tf.value">
+                <span class="chip-label">{{ tf.label }}<span v-if="tf.value !== 'all'" class="chip-n"> ({{ countByType(tf.value) }})</span></span>
+              </button>
+            </div>
             <input type="text" class="cat-filter" v-model="groupFilters[gi]" :placeholder="t('Filter categories…', 'Filtrer les catégories…')"
               autocomplete="off">
             <div class="cat-list">
@@ -263,6 +271,7 @@ function invert() {
 
 const expanded = reactive(new Set<number>())
 const groupFilters = reactive<Record<number, string>>({})
+const groupTypeFilters = reactive<Record<number, 'all' | CategoryType>>({})
 
 const hasValidGroup = computed(() =>
   props.groups.some(g => g.name.trim() && g.categories.length > 0)
@@ -317,8 +326,9 @@ function toggleGroupCategory(gi: number, name: string) {
 
 function filteredForGroup(gi: number) {
   const q = (groupFilters[gi] || '').trim().toLowerCase()
+  const tf = groupTypeFilters[gi] || 'all'
   return props.categories.filter(c =>
-    matchesType(c) && (!q || c.name.toLowerCase().includes(q))
+    (tf === 'all' || (c.type || 'tv') === tf) && (!q || c.name.toLowerCase().includes(q))
   )
 }
 </script>
