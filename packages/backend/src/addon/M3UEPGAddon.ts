@@ -476,6 +476,43 @@ export class M3UEPGAddon {
         return url ? [{ url, title: item.source?.name || item.name, behaviorHints: { notWebReady: true } }] : [];
     }
 
+    /** Resolve a Stalker series episode (re-fetch seasons to get the season cmd). */
+    private async stalkerEpisodeStream(id: string) {
+        const rest = id.slice(`xc${this.idPrefix}_se_`.length);
+        const m = rest.match(/^(.+)_(\d+)_(\d+)$/);
+        if (!m) return [];
+        const seriesId = m[1], season = +m[2], episode = +m[3];
+        await this.ensureDataLoaded();
+        const creds = this.stalkerCredsFor({});
+        if (!creds) return [];
+        const seasons = await stalkerProvider.getSeriesSeasons(creds, seriesId).catch(() => []);
+        const se = seasons.find((s: any) => s.season === season);
+        if (!se) return [];
+        const url = await stalkerProvider.resolveSeriesEpisode(creds, se.cmd, episode).catch(() => null);
+        return url ? [{ url, title: 'Play', behaviorHints: { notWebReady: true } }] : [];
+    }
+
+    /** Build a Stalker series meta: seasons/episodes from the portal + TMDB header. */
+    private async buildStalkerSeriesMeta(id: string, item: any) {
+        const creds = this.stalkerCredsFor(item);
+        const seasons = creds ? await stalkerProvider.getSeriesSeasons(creds, item.stalkerSeriesId).catch(() => []) : [];
+        const logoUrl = this.deriveFallbackLogoUrl(item);
+        const videos: any[] = [];
+        for (const s of seasons.sort((a: any, b: any) => a.season - b.season)) {
+            for (const ep of s.episodes) {
+                videos.push({
+                    id: `xc${this.idPrefix}_se_${item.stalkerSeriesId}_${s.season}_${ep}`,
+                    title: `Episode ${ep}`,
+                    season: s.season,
+                    episode: ep,
+                    ...(logoUrl ? { thumbnail: logoUrl } : {}),
+                });
+            }
+        }
+        const header = await this.seriesHeader(id, item, { tmdb_id: item.tmdbId, plot: item.plot, name: item.name });
+        return { ...header, videos };
+    }
+
     /** Parse a multi-source logical id. */
     parseMultiId(id: string): { kind: 'tv' | 'movie' | 'series' | 'episode'; hash?: string; season?: number; episode?: number } | null {
         const prefix = `xc${this.idPrefix}_`;
@@ -497,9 +534,19 @@ export class M3UEPGAddon {
         const seriesChans = this.channels.filter(c => c.id === seriesId);
         const streams: any[] = [];
         for (const sc of seriesChans) {
-            const src = this.sourceById(sc.source?.id);
-            if (!src || src.provider !== 'xtream') continue;
             try {
+                if (sc.stalkerSeriesId) {
+                    const creds = this.stalkerCredsFor(sc);
+                    if (!creds) continue;
+                    const seasons = await stalkerProvider.getSeriesSeasons(creds, sc.stalkerSeriesId).catch(() => []);
+                    const se = seasons.find((s: any) => s.season === season);
+                    if (!se) continue;
+                    const url = await stalkerProvider.resolveSeriesEpisode(creds, se.cmd, episode).catch(() => null);
+                    if (url) streams.push({ url, title: sc.source?.name || 'Source', behaviorHints: { notWebReady: true } });
+                    continue;
+                }
+                const src = this.sourceById(sc.source?.id);
+                if (!src || src.provider !== 'xtream') continue;
                 const { episodes } = await xtreamProvider.fetchSeriesEpisodes(src, sc.srcSeriesId);
                 const ep = episodes.find((e: any) => e.season === season && e.episode === episode);
                 if (ep) {
@@ -522,9 +569,19 @@ export class M3UEPGAddon {
         const merged = new Map<string, any>();
         let firstInfo: any = null;
         for (const sc of seriesChans) {
-            const src = this.sourceById(sc.source?.id);
-            if (!src || src.provider !== 'xtream') continue;
             try {
+                if (sc.stalkerSeriesId) {
+                    const creds = this.stalkerCredsFor(sc);
+                    const seasons = creds ? await stalkerProvider.getSeriesSeasons(creds, sc.stalkerSeriesId).catch(() => []) : [];
+                    if (!firstInfo) firstInfo = { tmdb_id: sc.tmdbId, plot: sc.plot, name: sc.name };
+                    for (const s of seasons) for (const ep of s.episodes) {
+                        const k = `${s.season}_${ep}`;
+                        if (!merged.has(k)) merged.set(k, { season: s.season, episode: ep, title: `Episode ${ep}` });
+                    }
+                    continue;
+                }
+                const src = this.sourceById(sc.source?.id);
+                if (!src || src.provider !== 'xtream') continue;
                 const { episodes, info } = await xtreamProvider.fetchSeriesEpisodes(src, sc.srcSeriesId);
                 if (!firstInfo && info) firstInfo = info;
                 for (const ep of episodes) {
@@ -782,6 +839,9 @@ export class M3UEPGAddon {
             return [];
         }
 
+        // Stalker series episodes use a dedicated id scheme (_se_<seriesId>_<season>_<ep>).
+        if (id.startsWith(`xc${this.idPrefix}_se_`)) return this.stalkerEpisodeStream(id);
+
         // Series episodes are not stored as channels — resolve them directly.
         const parsed = this.parseId(id);
         if (parsed?.kind === 'episode') {
@@ -979,6 +1039,8 @@ export class M3UEPGAddon {
         const parsed = this.parseId(id);
         if (parsed?.kind === 'series') {
             await this.ensureDataLoaded();
+            const seriesItem = this.channelMap.get(id);
+            if (seriesItem?.stalkerSeriesId) return this.buildStalkerSeriesMeta(id, seriesItem);
             return this.buildSeriesMeta(id, parsed.value);
         }
 

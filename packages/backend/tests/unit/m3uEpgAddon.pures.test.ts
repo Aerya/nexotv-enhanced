@@ -40,6 +40,12 @@ vi.mock('../../src/providers/stalkerProvider', () => ({
   getCategories: vi.fn(),
   resolveLink: vi.fn(async (_creds: any, _cmd: any, type: string = 'itv') =>
     type === 'vod' ? 'http://portal/movie/film.mkv?play_token=abc' : 'http://portal/live.ts'),
+  getSeriesSeasons: vi.fn(async () => [
+    { season: 1, episodes: [1, 2], cmd: 'S1CMD' },
+    { season: 2, episodes: [1], cmd: 'S2CMD' },
+  ]),
+  resolveSeriesEpisode: vi.fn(async (_creds: any, cmd: string, ep: number) =>
+    `http://portal/series/${cmd}_${ep}.mp4?play_token=xyz`),
 }));
 
 vi.mock('../../src/parsers/epgParser', () => ({
@@ -306,6 +312,38 @@ describe('stalker VOD', () => {
     expect(streams).toHaveLength(1);
     expect(streams[0].url).toBe('http://portal/movie/film.mkv?play_token=abc');
     expect(streams[0].title).toBe('Portail');
+  });
+});
+
+// ─── Stalker series ──────────────────────────────────────────────────────────
+
+describe('stalker series', () => {
+  function monoStalkerSeries() {
+    const a = new M3UEPGAddon({
+      provider: 'stalker', stalkerUrl: 'http://portal', stalkerMac: '00:1A:79:00:00:01',
+      catalogMode: 'single', selectedCategories: ['Séries'], categoryTypes: { 'Séries': 'series' },
+    } as any);
+    a.idPrefix = 'pfx';
+    a.channels = [{
+      id: 'xcpfx_s_14649', name: 'Fauda', type: 'series', mediaType: 'series',
+      stalkerSeriesId: '14649', plot: 'Synopsis.', tmdbId: '69557', category: 'Séries',
+    }];
+    a.channelMap = new Map(a.channels.map((c: any) => [c.id, c]));
+    return a;
+  }
+
+  it('builds series meta with seasons/episodes as videos', async () => {
+    const meta: any = await monoStalkerSeries().getDetailedMeta('xcpfx_s_14649');
+    expect(meta.type).toBe('series');
+    expect(meta.videos).toHaveLength(3); // 2 + 1
+    expect(meta.videos[0]).toMatchObject({ id: 'xcpfx_se_14649_1_1', season: 1, episode: 1 });
+    expect(meta.videos[2]).toMatchObject({ id: 'xcpfx_se_14649_2_1', season: 2, episode: 1 });
+  });
+
+  it('resolves a Stalker episode stream via the season cmd', async () => {
+    const streams = await monoStalkerSeries().getStreams('xcpfx_se_14649_2_1');
+    expect(streams).toHaveLength(1);
+    expect(streams[0].url).toBe('http://portal/series/S2CMD_1.mp4?play_token=xyz');
   });
 });
 

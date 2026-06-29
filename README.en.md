@@ -46,7 +46,7 @@ features on top of the upstream code.
 | **Home / Discover** | Choose, per catalog, which ones show on the **home** board; the others stay accessible via **Discover**. |
 | **Movies & Series (Xtream)** | Movies/Series categories become **real playable Stremio catalogs** (`movie` / `series`, series with **seasons + episodes**). |
 | **M3U** | `/movie/` entries are exposed as `movie` catalogs (direct playback). |
-| **Stalker** | **Stalker / Ministra** portal (MAC auth) as a **live TV + movies (VOD)** source (single **and** multi-source); movies TMDB-enriched and de-duplicated, streams resolved on play via `create_link`. *(Stalker series coming later.)* |
+| **Stalker** | **Stalker / Ministra** portal (MAC auth) as a **live TV + movies (VOD) + series** source (single **and** multi-source); movies/series TMDB-enriched and de-duplicated, streams resolved on play via `create_link`. |
 | **Search** | Accent/separator-insensitive matching (`tf 1` ≈ `TF1`, `asterix` ≈ `Astérix`). |
 | **Authentication** | Optional **single password** on the webui. |
 | **Saved configs** | **Server-side saved configurations** (named, reloadable). |
@@ -131,22 +131,23 @@ The catalog type follows the category type: *split* → one catalog per category
 > In Stremio/Nuvio, catalogs are grouped **by type**: a Movies catalog appears under
 > *Discover → Movies*, a Series catalog under *Discover → Series*.
 
-### Stalker / Ministra (live TV + movies)
+### Stalker / Ministra (live TV + movies + series)
 
 **Stalker** tab (and a **Stalker** option in multi-source): enter the **portal URL** and **MAC
 address**, click **Load categories**, then select and build catalogs like any other provider. The
-webui labels each category's **type** (TV / Movies).
+webui labels each category's **type** (TV / Movies / Series).
 
 - **Handshake + token** authentication (MAC), `/c/portal.php` path auto-detected.
-- TV categories = **ITV genres**; **Movie** categories = portal **VOD**; lists paginated via
-  `get_ordered_list`.
-- **Stalker movies are playable**: synopsis + `tmdb_id` come from the portal, enriched via **TMDB**
-  (key entered in the webui) with a fallback to portal data.
+- TV categories = **ITV genres**; **Movie** = portal **VOD**; **Series** = `type=series`; lists
+  paginated via `get_ordered_list`.
+- **Stalker movies and series are playable**: synopsis + `tmdb_id` come from the portal, enriched
+  via **TMDB** (key entered in the webui) with a fallback to portal data.
+- **Series**: seasons and episodes fetched via `movie_id`; each episode is resolved on play via
+  `create_link&type=vod` with the season's `cmd` + the episode number.
 - Stalker stream URLs are **dynamic**, so they are resolved **on play** via `create_link`
-  (TV `type=itv`, movies `type=vod`; ephemeral play token).
-- In multi-source, **Stalker movies de-duplicate** with Xtream/M3U movies sharing the same title
-  (several sources → one entry, multiple links).
-- **Stalker series coming later** (the portal's season/episode structure will be handled next).
+  (TV `type=itv`, movies/episodes `type=vod`; ephemeral play token).
+- In multi-source, **Stalker movies and series de-duplicate** with Xtream/M3U ones sharing the same
+  title (several sources → one entry, multiple links; episodes merged by season/number).
 
 ### TMDB enrichment (movies & series)
 
