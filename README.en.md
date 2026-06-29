@@ -8,7 +8,8 @@
 </p>
 
 > **The core stays IPTV: live TV channels.** The addon streams your live channels (Xtream,
-> M3U/M3U+, IPTV-org) in Stremio; Movies & Series catalogs (Xtream) come **on top**.
+> M3U/M3U+, IPTV-org, Stalker/Ministra) in Stremio; Movies & Series catalogs (Xtream, Stalker) come
+> **on top**.
 
 <p align="center">
   <a href="https://upandclear.org/2026/06/24/nexotv-enhanced/">
@@ -40,7 +41,7 @@ features on top of the upstream code.
 | Area | Addition |
 |---|---|
 | **Live TV channels** | The core: streams your **live TV channels** (Xtream, M3U/M3U+, IPTV-org, Stalker) in Stremio, with EPG, logos and search. *(upstream foundation, preserved.)* |
-| **Multi-source** | Add **several** Xtream/M3U sources mixed into the same catalogs, with **Movies/Series de-duplication** and per-source stream choice. |
+| **Multi-source** | Add **several** Xtream/M3U/Stalker sources mixed into the same catalogs, with **Movies/Series de-duplication** and per-source stream choice. |
 | **Categories** | The webui loads the feed's categories, **labels them by type** (TV / Movies / Series) and lets you **pick** which ones to keep (filter, all / none / invert). |
 | **Catalogs** | 3 layouts: a single catalog, one per category, or **custom catalogs** (named groups of categories). |
 | **Home / Discover** | Choose, per catalog, which ones show on the **home** board; the others stay accessible via **Discover**. |
@@ -108,7 +109,8 @@ features on top of the upstream code.
 3. Check the categories you want, then choose the **layout**:
    - **Single** — all categories in one catalog (categories remain an internal genre filter);
    - **Split** — one catalog per category;
-   - **Custom** — named catalogs, each grouping the categories of your choice.
+   - **Custom** — named catalogs, each grouping the categories of your choice; the **type filter
+     (TV / Movies / Series) is per-catalog** while selecting.
 4. **On the home screen** section: tick the catalogs to show on the Stremio **home** board; unticked
    ones stay accessible via **Discover** only (technically: a required genre → off the board but
    present in Discover).
@@ -173,21 +175,25 @@ Enter a **TMDB API key** in the webui (*Metadata (TMDB)* section) to fetch **ric
 ### Saved configurations (server-side)
 
 - **Save configuration** button in each provider → stores the current config under a name.
-- **Saved configurations** panel: **Load** (restores the form via `/{token}/configure`) / **Delete**.
+- **Saved configurations** panel: a **correct provider badge** (Xtream / M3U / Stalker / Multi…),
+  **Load** (fetches the server-decrypted config and restores the form) / **Delete**.
 - Stored in **SQLite** (`data/`, persisted via the Docker volume), **encrypted at rest** when
   `CONFIG_SECRET` is set. With a single password, these configs are **shared** (no separate accounts).
+- **Reconfigure from Stremio**: reopening the config via Stremio's *Configure* button restores the
+  form even when the token is encrypted/compressed (server-side decode, behind auth).
 
 ### Multi-source (mixing + de-duplication)
 
-**Multi-source** tab: add several named sources (Xtream / M3U), load and select categories
-**per source**, then pick the layout (combined by type / one catalog per category) and the
+**Multi-source** tab: add several named sources (Xtream / M3U / Stalker), load and select categories
+**per source**, then pick the layout (combined by type / one catalog per category / custom) and the
 **playback behaviour**.
 
 - **Mixing**: all selected channels from the sources are merged into the catalogs.
 - **Movies/Series de-duplication**: identical titles (after normalization: lowercase, no accents,
-  no `HD/4K/1080p/MULTI/VF…` tags) are grouped into **one item** offering **one stream per source**.
-  **TV channels** are not merged (listed per source, suffixed with the source name).
-- **Series**: episodes merged by (season, episode) across sources (Xtream).
+  no `HD/4K/1080p/MULTI/VF…` tags) are grouped into **one item** offering **one stream per source**,
+  across all source types (Xtream / M3U / Stalker). **TV channels** are not merged (listed per
+  source, suffixed with the source name).
+- **Series**: episodes merged by (season, episode) across sources (Xtream and Stalker).
 - **Playback** (`streamSelection`, set in the webui):
   - **Offer the choice** → Stremio lists one stream per source (IPTV1 / IPTVPerso…);
   - **Play the first available** → only the priority source's stream (source order).
