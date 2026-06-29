@@ -243,7 +243,12 @@ export class M3UEPGAddon {
         this.manifestRef = manifestRef;
         this.cacheKey = createCacheKey(config);
         this.idPrefix = this.cacheKey.slice(0, 8);
-        this.updateInterval = env.UPDATE_INTERVAL_MS;
+        // Per-config auto-refresh interval (webui, in hours), clamped to [1h, 720h];
+        // falls back to the global UPDATE_INTERVAL_MS when unset/invalid.
+        const cfgHours = Number((config as any).refreshHours);
+        this.updateInterval = (isFinite(cfgHours) && cfgHours > 0)
+            ? Math.min(Math.max(cfgHours, 1), 720) * 3600_000
+            : env.UPDATE_INTERVAL_MS;
         this.channels = [];
         this.channelMap = new Map();
         this.epgData = {};
@@ -262,7 +267,9 @@ export class M3UEPGAddon {
             'iptv-org': env.IPTV_ORG_CACHE_TTL_MS,
             'm3u': env.M3U_CACHE_TTL_MS,
         };
-        this.cacheTtl = TTL_MAP[this.providerName] ?? CACHE_TTL_MS;
+        // The SQLite cache must live at least as long as one refresh cycle so a
+        // long custom interval is honoured (no premature cold rebuild).
+        this.cacheTtl = Math.max(TTL_MAP[this.providerName] ?? CACHE_TTL_MS, this.updateInterval);
         this.log = makeLogger();
 
         if (typeof this.config.epgOffsetHours === 'string') {
@@ -1108,7 +1115,7 @@ export class M3UEPGAddon {
                 }
                 this.log.error('[TIMER] Background update failed:', e.message);
             });
-        }, env.UPDATE_INTERVAL_MS);
+        }, this.updateInterval);
         // unref: don't prevent Node.js process exit if this is the only active handle
         if (typeof (this._updateTimer as any).unref === 'function') {
             (this._updateTimer as any).unref();

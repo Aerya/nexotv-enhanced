@@ -46,6 +46,8 @@
       <TmdbKeyField v-model="form.tmdbApiKey" v-model:language="form.tmdbLanguage" />
     </fieldset>
 
+    <RefreshIntervalField v-model="form.refreshHours" />
+
     <fieldset>
       <legend>{{ t('Display', 'Affichage') }}</legend>
       <div class="form-group">
@@ -65,6 +67,7 @@
 import { reactive, ref, inject, onMounted } from 'vue'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
 import TmdbKeyField from './TmdbKeyField.vue'
+import RefreshIntervalField from './RefreshIntervalField.vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
@@ -84,6 +87,7 @@ const form = reactive({
   discoverOnly: [] as string[],
   tmdbApiKey: '',
   tmdbLanguage: 'fr-FR',
+  refreshHours: null as number | null,
 })
 
 const categories = ref<CategoryEntry[]>([])
@@ -137,6 +141,7 @@ function buildConfig(): (StalkerConfig & { catalogName?: string }) | null {
     config.categoryTypes = categoryTypes
   }
   if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
+  if (form.refreshHours) config.refreshHours = form.refreshHours
   if (form.catalogName.trim()) config.catalogName = form.catalogName.trim()
   if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
   return config
@@ -174,6 +179,7 @@ onMounted(() => {
   if (Array.isArray((d as any).discoverOnly)) form.discoverOnly = [...(d as any).discoverOnly]
   form.tmdbApiKey = (d as any).tmdbApiKey || ''
   form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
+  form.refreshHours = (d as any).refreshHours ?? null
   const seed = new Set<string>(d.selectedCategories || [])
   for (const g of (d.catalogGroups || [])) for (const c of g.categories) seed.add(c)
   if (seed.size) {
