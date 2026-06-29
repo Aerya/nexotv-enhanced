@@ -8,7 +8,7 @@
           <circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path>
         </svg>
         <span>
-          {{ t('Stalker / Ministra portal (MAC authentication): live TV and movies (VOD).', 'Portail Stalker / Ministra (authentification par MAC) : TV en direct et films (VOD).') }}
+          {{ t('Stalker / Ministra portal (MAC authentication): live TV, movies (VOD) and series.', 'Portail Stalker / Ministra (authentification par MAC) : TV en direct, films (VOD) et séries.') }}
         </span>
       </div>
       <div class="form-group">

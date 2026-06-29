@@ -150,12 +150,82 @@ export async function getVodList(creds: StalkerCreds, categoryId: string): Promi
     return out;
 }
 
-/** Combined categories for the config UI: live TV + movies, each typed. */
-export async function getCategories(creds: StalkerCreds): Promise<Array<{ name: string; type: 'tv' | 'movie' }>> {
-    const [genres, vod] = await Promise.all([getGenres(creds), getVodCategories(creds).catch(() => [])]);
-    const out: Array<{ name: string; type: 'tv' | 'movie' }> = genres.map(g => ({ name: g.title, type: 'tv' as const }));
+/** Series categories. */
+export async function getSeriesCategories(creds: StalkerCreds): Promise<Array<{ id: string; title: string }>> {
+    const js = await api(creds, 'type=series&action=get_categories');
+    if (!Array.isArray(js)) return [];
+    return js
+        .filter((c: any) => c && c.id && c.id !== '*' && c.title)
+        .map((c: any) => ({ id: String(c.id), title: String(c.title).trim() }));
+}
+
+/** All series of a category (handles pagination). */
+export async function getSeriesList(creds: StalkerCreds, categoryId: string): Promise<any[]> {
+    const out: any[] = [];
+    let page = 1;
+    let pages = 1;
+    do {
+        const js = await api(creds, `type=series&action=get_ordered_list&category=${encodeURIComponent(categoryId)}&sortby=added&p=${page}`);
+        const data = js?.data;
+        if (!Array.isArray(data)) break;
+        out.push(...data);
+        const total = parseInt(js.total_items, 10) || 0;
+        const per = parseInt(js.max_page_items, 10) || data.length || 1;
+        pages = Math.max(1, Math.ceil(total / per));
+        page++;
+        if (page > 400) break; // hard safety cap
+    } while (page <= pages);
+    return out;
+}
+
+/** Seasons (with their episode numbers + play cmd) for a series via movie_id. */
+export async function getSeriesSeasons(creds: StalkerCreds, seriesId: string): Promise<Array<{ season: number; episodes: number[]; cmd: string }>> {
+    const out: Array<{ season: number; episodes: number[]; cmd: string }> = [];
+    let page = 1;
+    let pages = 1;
+    do {
+        const js = await api(creds, `type=series&action=get_ordered_list&movie_id=${encodeURIComponent(seriesId)}&p=${page}`);
+        const data = js?.data;
+        if (!Array.isArray(data)) break;
+        for (const s of data) {
+            if (!s || !s.cmd) continue;
+            const idStr = String(s.id || '');
+            const colon = idStr.lastIndexOf(':');
+            let season = colon >= 0 ? parseInt(idStr.slice(colon + 1), 10) : NaN;
+            if (isNaN(season)) season = parseInt(String(s.name || '').replace(/\D+/g, ''), 10);
+            const episodes = Array.isArray(s.series) ? s.series.map((n: any) => Number(n)).filter((n: number) => !isNaN(n)) : [];
+            out.push({ season: isNaN(season) ? 0 : season, episodes, cmd: String(s.cmd) });
+        }
+        const total = parseInt(js.total_items, 10) || 0;
+        const per = parseInt(js.max_page_items, 10) || data.length || 1;
+        pages = Math.max(1, Math.ceil(total / per));
+        page++;
+        if (page > 50) break;
+    } while (page <= pages);
+    return out;
+}
+
+/** Resolve a series episode: create_link (type=vod) with the season cmd + episode number. */
+export async function resolveSeriesEpisode(creds: StalkerCreds, seasonCmd: string, episode: number): Promise<string | null> {
+    if (!seasonCmd) return null;
+    const js = await api(creds, `type=vod&action=create_link&cmd=${encodeURIComponent(seasonCmd)}&series=${encodeURIComponent(String(episode))}&forced_storage=0&disable_ad=0`);
+    let real = js?.cmd;
+    if (!real || typeof real !== 'string') return null;
+    real = real.replace(/^\s*(ffmpeg|auto|mpegts)\s+/i, '').trim();
+    return real || null;
+}
+
+/** Combined categories for the config UI: live TV + movies + series, each typed. */
+export async function getCategories(creds: StalkerCreds): Promise<Array<{ name: string; type: 'tv' | 'movie' | 'series' }>> {
+    const [genres, vod, series] = await Promise.all([
+        getGenres(creds),
+        getVodCategories(creds).catch(() => []),
+        getSeriesCategories(creds).catch(() => []),
+    ]);
+    const out: Array<{ name: string; type: 'tv' | 'movie' | 'series' }> = genres.map(g => ({ name: g.title, type: 'tv' as const }));
     const seen = new Set(out.map(o => o.name));
     for (const c of vod) if (!seen.has(c.title)) { out.push({ name: c.title, type: 'movie' }); seen.add(c.title); }
+    for (const c of series) if (!seen.has(c.title)) { out.push({ name: c.title, type: 'series' }); seen.add(c.title); }
     return out;
 }
 
@@ -176,9 +246,11 @@ export async function buildChannels(creds: StalkerCreds, opts: {
     const types = opts.types || {};
     const wantAll = opts.selected.size === 0;
     const movieCats = new Set([...opts.selected].filter(c => types[c] === 'movie'));
-    const [genres, vodCats] = await Promise.all([
+    const seriesCats = new Set([...opts.selected].filter(c => types[c] === 'series'));
+    const [genres, vodCats, seriesCatList] = await Promise.all([
         getGenres(creds),
         movieCats.size ? getVodCategories(creds).catch(() => []) : Promise.resolve([] as any[]),
+        seriesCats.size ? getSeriesCategories(creds).catch(() => []) : Promise.resolve([] as any[]),
     ]);
     const out: any[] = [];
 
@@ -227,6 +299,34 @@ export async function buildChannels(creds: StalkerCreds, opts: {
                 type: 'movie',
                 mediaType: 'movie',
                 stalkerVodCmd: it.cmd,
+                ...(it.tmdb_id ? { tmdbId: String(it.tmdb_id) } : {}),
+                plot: it.description || '',
+                logo: it.screenshot_uri || it.pic || '',
+                category: c.title,
+                ...(opts.source ? { source: opts.source } : {}),
+                attributes: { 'group-title': c.title },
+            });
+        }
+    }
+
+    // ── Series (only for explicitly selected series categories) ─────────────────
+    for (const c of seriesCatList) {
+        if (!seriesCats.has(c.title)) continue;
+        let items: any[] = [];
+        try { items = await getSeriesList(creds, c.id); }
+        catch (e: any) { log.warn('[STALKER] series fetch failed', c.title, e?.message); continue; }
+        for (const it of items) {
+            if (!it || !it.id || !it.name) continue;
+            const seriesId = String(it.id).split(':')[0];
+            const idBase = opts.source
+                ? `xc${opts.idPrefix}_sr_${titleHash(it.name)}`
+                : `xc${opts.idPrefix}_s_${seriesId}`;
+            out.push({
+                id: idBase,
+                name: opts.source ? `${it.name} (${opts.source.name})` : it.name,
+                type: 'series',
+                mediaType: 'series',
+                stalkerSeriesId: seriesId,
                 ...(it.tmdb_id ? { tmdbId: String(it.tmdb_id) } : {}),
                 plot: it.description || '',
                 logo: it.screenshot_uri || it.pic || '',
