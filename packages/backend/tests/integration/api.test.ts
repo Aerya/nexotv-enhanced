@@ -15,6 +15,8 @@ import fs from 'fs';
 
 const baseEnv = {
   CONFIG_SECRET: null as string | null,
+  WEBUI_PASSWORD: null as string | null,
+  WEBUI_SESSION_TTL_MS: 3600000,
   CACHE_ENABLED: false,
   CACHE_TTL_MS: 21600000,
   MAX_CACHE_ENTRIES: 10,
@@ -116,20 +118,27 @@ describe('API routes (without CONFIG_SECRET)', () => {
     });
   });
 
-  describe('GET /api/stats/views', () => {
-    it('returns the viewing-log shape', async () => {
-      const res = await request(app).get('/api/stats/views');
-      expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('history');
-      expect(res.body).toHaveProperty('active');
-      expect(res.body).toHaveProperty('total');
+  describe('private instance-wide APIs', () => {
+    it.each([
+      ['get', '/api/configs'],
+      ['get', '/api/configs/deadbeef'],
+      ['delete', '/api/configs/deadbeef'],
+      ['get', '/api/stats/views'],
+      ['delete', '/api/stats/views'],
+    ] as const)('%s %s is disabled on a public instance', async (method, path) => {
+      const res = await request(app)[method](path);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/disabled on public instances/i);
     });
-  });
 
-  describe('POST /api/stats/feed', () => {
-    it('returns 404 for an unknown config id', async () => {
-      const res = await request(app).post('/api/stats/feed').send({ id: 'deadbeef' });
-      expect(res.status).toBe(404);
+    it.each([
+      ['/api/configs', { name: 'Shared', config: { provider: 'm3u' } }],
+      ['/api/decode-token', { token: 'anything' }],
+      ['/api/stats/feed', { id: 'deadbeef' }],
+    ])('POST %s is disabled on a public instance', async (path, body) => {
+      const res = await request(app).post(path).send(body);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/disabled on public instances/i);
     });
   });
 
@@ -220,17 +229,66 @@ describe('API routes (with CONFIG_SECRET)', () => {
     expect(res.body.encryptionEnabled).toBe(true);
   });
 
-  it('POST /api/decode-token round-trips an encrypted token back to the config', async () => {
-    const config = { provider: 'stalker', stalkerUrl: 'http://portal', stalkerMac: '00:1A:79:00:00:01' };
-    const enc = await request(app).post('/encrypt').send(config);
-    expect(enc.body.token).toMatch(/^enc:/);
-    const res = await request(app).post('/api/decode-token').send({ token: enc.body.token });
-    expect(res.status).toBe(200);
-    expect(res.body.config).toMatchObject(config);
+  it('POST /api/decode-token stays disabled in public mode', async () => {
+    const res = await request(app).post('/api/decode-token').send({ token: 'anything' });
+    expect(res.status).toBe(403);
+  });
+});
+
+// ─── Private mode (CONFIG_SECRET + WEBUI_PASSWORD) ───────────────────────────
+
+describe('private API routes with WEBUI_PASSWORD', () => {
+  let app: Express;
+  let cookie: string;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    vi.doMock('../../src/config/env', () => ({
+      default: {
+        ...baseEnv,
+        CONFIG_SECRET: 'test-secret-32-chars-long!!',
+        WEBUI_PASSWORD: 'private-password',
+        SQLITE_PATH: ':memory:',
+      },
+      repoRoot: '/tmp',
+    }));
+    const expressModule = await import('express');
+    app = expressModule.default();
+    app.use(expressModule.default.json({ limit: '512kb' }));
+    const { default: apiRouter } = await import('../../src/routes/api');
+    app.use(apiRouter);
+
+    const login = await request(app).post('/api/login').send({ password: 'private-password' });
+    expect(login.status).toBe(200);
+    cookie = login.headers['set-cookie'][0].split(';')[0];
   });
 
-  it('POST /api/decode-token returns 400 without a token', async () => {
-    const res = await request(app).post('/api/decode-token').send({});
-    expect(res.status).toBe(400);
+  afterAll(() => {
+    vi.resetModules();
+    vi.doUnmock('../../src/config/env');
+  });
+
+  it('rejects shared config access without a session', async () => {
+    const res = await request(app).get('/api/configs');
+    expect(res.status).toBe(401);
+  });
+
+  it('allows shared config access with a valid session', async () => {
+    const res = await request(app).get('/api/configs').set('Cookie', cookie);
+    expect(res.status).toBe(200);
+    expect(res.body.configs).toEqual([]);
+  });
+
+  it('round-trips an encrypted token only with a valid session', async () => {
+    const config = { provider: 'stalker', stalkerUrl: 'http://portal', stalkerMac: '00:1A:79:00:00:01' };
+    const enc = await request(app).post('/encrypt').set('Cookie', cookie).send(config);
+    expect(enc.body.token).toMatch(/^enc:/);
+
+    const res = await request(app)
+      .post('/api/decode-token')
+      .set('Cookie', cookie)
+      .send({ token: enc.body.token });
+    expect(res.status).toBe(200);
+    expect(res.body.config).toMatchObject(config);
   });
 });

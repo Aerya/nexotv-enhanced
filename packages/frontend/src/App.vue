@@ -8,7 +8,14 @@
     <template v-else-if="auth.state.ready">
     <main class="main-content">
       <section class="config-section">
-        <SavedConfigs />
+        <SavedConfigs v-if="auth.state.enabled" />
+        <div v-else class="public-mode-notice" role="status">
+          <strong>{{ t('Public mode', 'Mode public') }}</strong>
+          <span>{{ t(
+            'Your configuration is not saved on this server. Keep the personal addon URL generated at the end private.',
+            'Votre configuration n\'est pas enregistrée sur ce serveur. Gardez privée l\'URL personnelle générée à la fin.'
+          ) }}</span>
+        </div>
         <div class="card configurator-card" :key="restoreKey">
           <h2>{{ t('Provider', 'Fournisseur') }}</h2>
 
@@ -78,7 +85,7 @@
           </div>
         </div>
 
-        <StatsPanel />
+        <StatsPanel v-if="auth.state.enabled" />
       </section>
 
       <section class="about-section">
@@ -178,7 +185,8 @@ async function resolveReconfigure() {
     resetDecodedToken()
     if (!useDecodedToken().decodedConfig) {
       // enc:/compressed token → decode server-side (needs auth).
-      if (!(auth.state.authenticated || !auth.state.enabled)) return // wait for login
+      if (!auth.state.enabled) { reconfigureResolved = true; return }
+      if (!auth.state.authenticated) return // wait for login
       try {
         const r = await fetch('/api/decode-token', {
           method: 'POST',
@@ -214,4 +222,22 @@ watch(() => [auth.state.ready, auth.state.authenticated], () => {
 </script>
 
 <style scoped>
+.public-mode-notice {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.08);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.9rem;
+}
+
+.public-mode-notice strong { color: #7dd3fc; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .public-mode-notice { align-items: flex-start; flex-direction: column; }
+}
 </style>

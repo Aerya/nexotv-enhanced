@@ -57,7 +57,7 @@
     </fieldset>
 
     <div class="form-actions">
-      <button type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
+      <button v-if="auth.state.enabled" type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
       <button type="submit" class="btn primary">{{ t('Install Addon', 'Installer l\'addon') }}</button>
     </div>
   </form>
@@ -76,6 +76,7 @@ import type { StalkerConfig, CatalogMode, CatalogGroup } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
 const { t } = useI18n()
+const auth = useAuth()
 
 const form = reactive({
   stalkerUrl: '',

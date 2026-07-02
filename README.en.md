@@ -19,6 +19,8 @@
 
 > Overview, install guide and screenshots: **[upandclear.org — NexoTV Enhanced](https://upandclear.org/2026/06/24/nexotv-enhanced/)**
 
+> **Very easy installation (French): [step-by-step guide](INSTALLATION-FACILE.md).**
+
 ---
 
 ## Project origin (attribution)
@@ -59,6 +61,18 @@ features on top of the upstream code.
 
 > Fully **backward-compatible**: with no category selection, behaviour matches the original addon
 > (all channels, one catalog).
+
+## Public mode or private mode
+
+NexoTV Enhanced deliberately supports two distinct deployment modes:
+
+| Mode | `.env` file | Behaviour |
+|---|---|---|
+| **Public / community** | `CONFIG_SECRET` only | Everyone creates their own encrypted URL. Server-side saved configs, statistics and credential-bearing token restore are disabled. |
+| **Private / household** | `CONFIG_SECRET` + `WEBUI_PASSWORD` | The web UI requires the shared password. Everyone who knows it shares the instance's saved configs and statistics. |
+
+`CONFIG_SECRET` encrypts personal tokens; it does not create accounts. `WEBUI_PASSWORD` opens one
+shared private space; it does not create separate users. Personal addon URLs must always stay private.
 
 ---
 
@@ -173,6 +187,8 @@ Enter a **TMDB API key** in the webui (*Metadata (TMDB)* section) to fetch **ric
 - Session via a **signed HMAC cookie** (HttpOnly, SameSite=Lax, Secure behind HTTPS), 30-day default
   (`WEBUI_SESSION_TTL_MS`), constant-time password comparison, rate-limited `/api/login`.
 - **Log out** button in the header (next to the EN/FR switch) when signed in.
+- Without `WEBUI_PASSWORD`, the configurator stays public while every endpoint exposing shared data
+  or plaintext credentials is disabled server-side.
 
 ### Statistics (viewing & feeds)
 
@@ -191,8 +207,10 @@ Enter a **TMDB API key** in the webui (*Metadata (TMDB)* section) to fetch **ric
 - **Save configuration** button in each provider → stores the current config under a name.
 - **Saved configurations** panel: a **correct provider badge** (Xtream / M3U / Stalker / Multi…),
   **Load** (fetches the server-decrypted config and restores the form) / **Delete**.
-- Stored in **SQLite** (`data/`, persisted via the Docker volume), **encrypted at rest** when
-  `CONFIG_SECRET` is set. With a single password, these configs are **shared** (no separate accounts).
+- Available only in **private mode**, when `WEBUI_PASSWORD` is set.
+- Stored in **SQLite** (`data/`, persisted via the Docker volume) and **encrypted at rest** with
+  `CONFIG_SECRET`. Everyone who knows the password shares them; there are no separate accounts.
+- In **public mode**, save controls and the list are hidden, and direct API calls receive `403`.
 - **Reconfigure from Stremio**: reopening the config via Stremio's *Configure* button restores the
   form even when the token is encrypted/compressed (server-side decode, behind auth).
 
@@ -244,6 +262,8 @@ The catalog **structure** (which catalogs, their types) is fixed by the token: i
 
 Multi-arch image (amd64/arm64) published on GHCR: `ghcr.io/aerya/nexotv-enhanced:latest`.
 
+For a first install or a public-instance upgrade, use the **[easy installation guide](INSTALLATION-FACILE.md)**.
+
 ```yaml
 # docker-compose.yml
 services:
@@ -254,6 +274,8 @@ services:
       - "7000:7000"
     env_file:
       - .env
+    environment:
+      CONFIG_SECRET: ${CONFIG_SECRET:?Set CONFIG_SECRET in the .env file}
     volumes:
       - ./data:/app/data     # persistence (cache + saved configs)
       - ./config:/app/config
@@ -265,8 +287,8 @@ services:
 | Variable | Role | Default |
 |---|---|---|
 | `ADDON_NAME` | Name shown in Stremio/Nuvio | `NexoTV-Enhanced` |
-| `CONFIG_SECRET` | Enables AES-256-GCM encryption of tokens **and** saved configs (≥16 chars) | *(none)* |
-| `WEBUI_PASSWORD` | Webui password (empty = open UI) | *(none)* |
+| `CONFIG_SECRET` | Encrypts tokens and saves; **required for public instances** (≥16 chars) | *(none)* |
+| `WEBUI_PASSWORD` | Enables shared private mode: protected webui, saved configs and statistics | *(public mode)* |
 | `WEBUI_SESSION_TTL_MS` | Session lifetime | `2592000000` (30 d) |
 | `TMDB_API_KEY` | **Global** TMDB fallback key (the webui key takes priority) | *(none)* |
 | `TMDB_LANGUAGE` | Default TMDB language | `fr-FR` |

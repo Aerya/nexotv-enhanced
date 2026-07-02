@@ -7,6 +7,9 @@ services:
       - "7000:7000"
     env_file:
       - .env
+    environment:
+      # Refuse to start this Compose stack with unencrypted configuration URLs.
+      CONFIG_SECRET: ${CONFIG_SECRET:?Set CONFIG_SECRET in the .env file}
     volumes:
       - ./data:/app/data
       - ./config:/app/config

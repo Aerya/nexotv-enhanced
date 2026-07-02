@@ -77,7 +77,7 @@
     </fieldset>
 
     <div class="form-actions">
-      <button type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
+      <button v-if="auth.state.enabled" type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
       <button type="submit" class="btn primary" id="iptv-org-submit">
         {{ t('Install Addon', 'Installer l\'addon') }}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -93,11 +93,13 @@
 import { ref, computed, onMounted, inject } from 'vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
+import { useAuth } from '../composables/useAuth'
 import { useI18n } from '../composables/useI18n'
 import type { IptvOrgConfig } from '../types/config'
 
 const oc = inject<any>('overlayControl')!
 const { t } = useI18n()
+const auth = useAuth()
 const catalogName = ref('')
 
 const IPTV_ORG_BASE = 'https://iptv-org.github.io/api'

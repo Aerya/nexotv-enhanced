@@ -85,3 +85,17 @@ export function requireAuth(req: any, res: any, next: any) {
     if (isAuthenticated(req)) return next();
     res.status(401).json({ error: 'Authentication required' });
 }
+
+/**
+ * Protect features that expose instance-wide data.
+ *
+ * A public instance deliberately has no authenticated identity: visitors may
+ * build their own encrypted addon URL, but they must never inherit access to
+ * the shared config store, viewing history, or plaintext token restoration.
+ */
+export function requirePrivateAccess(req: any, res: any, next: any) {
+    if (!authEnabled()) {
+        return res.status(403).json({ error: 'Private feature disabled on public instances' });
+    }
+    return requireAuth(req, res, next);
+}

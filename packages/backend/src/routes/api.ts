@@ -5,7 +5,7 @@ import env from '../config/env';
 import { encryptConfig, tryParseConfigToken } from '../utils/cryptoConfig';
 import {
     authEnabled, verifyPassword, createSession, isAuthenticated,
-    sessionCookieHeader, requireAuth,
+    sessionCookieHeader, requireAuth, requirePrivateAccess,
 } from '../utils/webauth';
 import { loginLimiter } from '../middleware/rateLimiter';
 import { listConfigs, getConfig, saveConfig, deleteConfig } from '../utils/configStore';
@@ -38,17 +38,17 @@ router.post('/api/logout', (req, res) => {
 });
 
 // ── Saved configurations (server-side, gated) ─────────────────────────────────
-router.get('/api/configs', requireAuth, (_req, res) => {
+router.get('/api/configs', requirePrivateAccess, (_req, res) => {
     res.json({ configs: listConfigs() });
 });
 
-router.get('/api/configs/:id', requireAuth, (req, res) => {
+router.get('/api/configs/:id', requirePrivateAccess, (req, res) => {
     const config = getConfig(req.params.id);
     if (!config) return res.status(404).json({ error: 'Not found' });
     res.json({ config });
 });
 
-router.post('/api/configs', requireAuth, (req, res) => {
+router.post('/api/configs', requirePrivateAccess, (req, res) => {
     const { name, config, id } = req.body || {};
     if (!config || typeof config !== 'object') {
         return res.status(400).json({ error: 'Missing config' });
@@ -61,7 +61,7 @@ router.post('/api/configs', requireAuth, (req, res) => {
     }
 });
 
-router.delete('/api/configs/:id', requireAuth, (req, res) => {
+router.delete('/api/configs/:id', requirePrivateAccess, (req, res) => {
     const removed = deleteConfig(req.params.id);
     res.json({ ok: true, removed });
 });
@@ -96,7 +96,7 @@ router.post('/encrypt', requireAuth, (req, res) => {
 
 // Decode a manifest token back into its config (for restoring the form when
 // reconfiguring from Stremio). Auth-gated: it returns plaintext credentials.
-router.post('/api/decode-token', requireAuth, (req, res) => {
+router.post('/api/decode-token', requirePrivateAccess, (req, res) => {
     const token = (req.body && req.body.token) ? String(req.body.token) : '';
     if (!token) return res.status(400).json({ error: 'Token required' });
     try {
@@ -111,7 +111,7 @@ router.post('/api/decode-token', requireAuth, (req, res) => {
 // ─── Stats ───────────────────────────────────────────────────────────────────
 
 // Viewing log (output): recent + history of stream-list requests.
-router.get('/api/stats/views', requireAuth, (req, res) => {
+router.get('/api/stats/views', requirePrivateAccess, (req, res) => {
     const all = viewLog.list();
     const now = Date.now();
     const ACTIVE_MS = 10 * 60 * 1000;
@@ -120,13 +120,13 @@ router.get('/api/stats/views', requireAuth, (req, res) => {
     res.json({ total: all.length, active: recent.length, recent, history: all.slice(0, limit) });
 });
 
-router.delete('/api/stats/views', requireAuth, (req, res) => {
+router.delete('/api/stats/views', requirePrivateAccess, (req, res) => {
     viewLog.clear();
     res.json({ ok: true });
 });
 
 // Feed stats (input): number of TV/Movie/Series groups for a saved config.
-router.post('/api/stats/feed', requireAuth, async (req, res) => {
+router.post('/api/stats/feed', requirePrivateAccess, async (req, res) => {
     const id = req.body && req.body.id ? String(req.body.id) : '';
     const config = id ? getConfig(id) : null;
     if (!config) return res.status(404).json({ error: 'Config not found' });
