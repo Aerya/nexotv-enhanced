@@ -109,7 +109,7 @@
     </fieldset>
 
     <div class="form-actions">
-      <button type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
+      <button v-if="auth.state.enabled" type="button" class="btn ghost" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
       <button type="submit" class="btn primary">
         {{ t('Install Addon', 'Installer l\'addon') }}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -134,6 +134,7 @@ import { useI18n } from '../composables/useI18n'
 import type { XtreamConfig, CatalogMode, CatalogGroup } from '../types/config'
 
 const { t } = useI18n()
+const auth = useAuth()
 
 const oc = inject<any>('overlayControl')!
 const { info: addonInfo } = useAddonInfo()

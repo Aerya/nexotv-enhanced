@@ -168,7 +168,7 @@
     </fieldset>
 
     <div class="form-actions">
-      <button class="btn ghost" type="button" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
+      <button v-if="auth.state.enabled" class="btn ghost" type="button" @click="handleSave">{{ t('Save configuration', 'Sauvegarder la configuration') }}</button>
       <button class="btn primary" type="button" @click="handleInstall">
         {{ t('Install Addon', 'Installer l\'addon') }}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -195,6 +195,7 @@ import type { M3uConfig, CatalogMode, CatalogGroup } from '../types/config'
 const oc = inject<any>('overlayControl')!
 const { playlists } = usePublicPlaylists()
 const { t } = useI18n()
+const auth = useAuth()
 
 const USER_AGENT_PRESETS = [
   { label: 'TiviMate',         value: 'TiviMate/4.7.0 (Android)' },

@@ -20,6 +20,8 @@
 
 > Présentation, installation et captures : **[upandclear.org — NexoTV Enhanced](https://upandclear.org/2026/06/24/nexotv-enhanced/)**
 
+> **Installation sans prise de tête : [guide pas à pas](INSTALLATION-FACILE.md).**
+
 ---
 
 ## Origine du projet (attribution)
@@ -60,6 +62,19 @@ fonctionnalités au-dessus du code amont.
 
 > Entièrement **rétrocompatible** : sans sélection de catégories, le comportement reste celui de
 > l'addon d'origine (toutes les chaînes, un seul catalogue).
+
+## Mode public ou mode privé
+
+NexoTV Enhanced propose deux usages volontairement distincts :
+
+| Mode | Fichier `.env` | Comportement |
+|---|---|---|
+| **Public / communautaire** | `CONFIG_SECRET` uniquement | Chacun crée sa propre URL chiffrée. Les configurations sauvegardées, statistiques et restaurations contenant des identifiants sont désactivées côté serveur. |
+| **Privé / foyer** | `CONFIG_SECRET` + `WEBUI_PASSWORD` | La webui demande le mot de passe. Les personnes qui le connaissent partagent les configurations sauvegardées et les statistiques de l'instance. |
+
+`CONFIG_SECRET` ne crée pas de comptes : il chiffre les tokens personnels. `WEBUI_PASSWORD` ne crée
+pas non plus de comptes séparés : il ouvre un espace privé commun. Une URL personnelle d'addon doit
+toujours rester privée, car elle donne accès aux catalogues correspondants.
 
 ---
 
@@ -176,6 +191,8 @@ Renseigne une **clé API TMDB** dans la webui (section *Métadonnées (TMDB)*) p
 - Session par **cookie signé HMAC** (HttpOnly, SameSite=Lax, Secure derrière HTTPS), durée 30 j par
   défaut (`WEBUI_SESSION_TTL_MS`), mot de passe comparé à temps constant, `/api/login` rate-limité.
 - Bouton **Déconnexion** dans l'en-tête (à côté du sélecteur EN/FR) quand tu es connecté.
+- Quand `WEBUI_PASSWORD` est absent, le configurateur reste public mais toutes les fonctions donnant
+  accès à des données globales ou à des identifiants en clair sont coupées côté serveur.
 
 ### Statistiques (visionnage & flux)
 
@@ -194,9 +211,12 @@ Panneau **Statistiques** sur la webui (derrière l'authentification) :
 - Bouton **Save configuration** dans chaque provider → enregistre la config courante sous un nom.
 - Panneau **Saved configurations** : badge **du bon fournisseur** (Xtream / M3U / Stalker / Multi…),
   **Load** (recharge la config déchiffrée côté serveur et restaure le formulaire) / **Delete**.
-- Stockées dans **SQLite** (`data/`, persistant via le volume Docker), **chiffrées au repos** si
-  `CONFIG_SECRET` est défini. Avec un mot de passe unique, ces configs sont **partagées** (pas de
-  comptes séparés).
+- Disponibles uniquement en **mode privé**, lorsque `WEBUI_PASSWORD` est défini.
+- Stockées dans **SQLite** (`data/`, persistant via le volume Docker) et **chiffrées au repos** avec
+  `CONFIG_SECRET`. Ces configs sont **partagées** entre toutes les personnes connaissant le mot de
+  passe : il n'existe pas de comptes séparés.
+- En **mode public**, le bouton de sauvegarde et la liste sont masqués, et les routes correspondantes
+  répondent `403` même si elles sont appelées directement.
 - **Reconfigurer depuis Stremio** : rouvrir la config via le bouton *Configure* de Stremio restaure
   le formulaire même quand le token est chiffré/compressé (déchiffrement serveur, derrière l'auth).
 
@@ -250,6 +270,10 @@ La **structure** des catalogues (lesquels, leurs types) est figée par le token 
 
 Image multi-arch (amd64/arm64) publiée sur GHCR : `ghcr.io/aerya/nexotv-enhanced:latest`.
 
+Pour une première installation ou une mise à jour d'instance publique, suivre le
+**[guide d'installation facile](INSTALLATION-FACILE.md)**. Il contient les commandes à copier-coller,
+la génération du secret et les deux vérifications de sécurité à effectuer.
+
 ```yaml
 # docker-compose.yml
 services:
@@ -260,6 +284,8 @@ services:
       - "7000:7000"
     env_file:
       - .env
+    environment:
+      CONFIG_SECRET: ${CONFIG_SECRET:?Définir CONFIG_SECRET dans le fichier .env}
     volumes:
       - ./data:/app/data     # persistance (cache + configs sauvegardées)
       - ./config:/app/config
@@ -271,8 +297,8 @@ services:
 | Variable | Rôle | Défaut |
 |---|---|---|
 | `ADDON_NAME` | Nom affiché dans Stremio/Nuvio | `NexoTV-Enhanced` |
-| `CONFIG_SECRET` | Active le chiffrement AES-256-GCM des tokens **et** des configs sauvegardées (≥16 car.) | *(aucun)* |
-| `WEBUI_PASSWORD` | Mot de passe de la webui (vide = UI ouverte) | *(aucun)* |
+| `CONFIG_SECRET` | Chiffre les tokens et les sauvegardes ; **obligatoire pour une instance publique** (≥16 car.) | *(aucun)* |
+| `WEBUI_PASSWORD` | Active le mode privé commun : webui protégée, sauvegardes et statistiques partagées | *(mode public)* |
 | `WEBUI_SESSION_TTL_MS` | Durée de session | `2592000000` (30 j) |
 | `TMDB_API_KEY` | Clé TMDB **globale** de repli (la clé saisie dans la webui prime) | *(aucune)* |
 | `TMDB_LANGUAGE` | Langue TMDB par défaut | `fr-FR` |
