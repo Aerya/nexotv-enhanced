@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { getRouter } from 'stremio-addon-sdk';
 import { tokenLimiter } from '../middleware/rateLimiter';
 import crypto from 'crypto';
-import { tryParseConfigToken } from '../utils/cryptoConfig';
+import { resolveConfigToken } from '../utils/configTokenStore';
 import createAddon from '../addon/builder';
 import env from '../config/env';
 import { makeLogger } from '../utils/logger';
@@ -18,7 +18,7 @@ const CACHE_ENABLED = env.CACHE_ENABLED;
 const tokenHashCache = new Map<string, string>();
 
 function maybeDecryptConfig(token: string) {
-    return tryParseConfigToken(token);
+    return resolveConfigToken(token);
 }
 
 const STATIC_PREFIXES = new Set(['css', 'js', 'html', 'logo', 'images', 'fonts', 'assets']);

@@ -68,11 +68,15 @@ NexoTV Enhanced deliberately supports two distinct deployment modes:
 
 | Mode | `.env` file | Behaviour |
 |---|---|---|
-| **Public / community** | `CONFIG_SECRET` only | Everyone creates their own encrypted URL. Server-side saved configs, statistics and credential-bearing token restore are disabled. |
+| **Public / community** | `CONFIG_SECRET` only | Everyone creates their own short, opaque URL. Server-side saved configs, statistics and credential-bearing token restore are disabled. |
 | **Private / household** | `CONFIG_SECRET` + `WEBUI_PASSWORD` | The web UI requires the shared password. Everyone who knows it shares the instance's saved configs and statistics. |
 
 `CONFIG_SECRET` encrypts personal tokens; it does not create accounts. `WEBUI_PASSWORD` opens one
 shared private space; it does not create separate users. Personal addon URLs must always stay private.
+
+The encrypted configuration behind each short URL is stored in `data/cache.sqlite`. Keep and back up
+the `data/` volume: deleting this database invalidates existing short URLs. Legacy URLs containing a
+full self-contained token remain compatible.
 
 ---
 
@@ -129,8 +133,9 @@ shared private space; it does not create separate users. Personal addon URLs mus
 4. **On the home screen** section: tick the catalogs to show on the Stremio **home** board; unticked
    ones stay accessible via **Discover** only (technically: a required genre → off the board but
    present in Discover).
-5. **Install Addon**: the selection is encoded (and **compressed**) into the config token,
-   encrypted when `CONFIG_SECRET` is set.
+5. **Install Addon**: the configuration is compressed, encrypted, then stored in SQLite. The manifest
+   URL contains only a 36-character opaque reference, so adding many providers or categories no
+   longer makes the URL grow.
 
 ### Movies & Series (Xtream)
 
@@ -277,7 +282,7 @@ services:
     environment:
       CONFIG_SECRET: ${CONFIG_SECRET:?Set CONFIG_SECRET in the .env file}
     volumes:
-      - ./data:/app/data     # persistence (cache + saved configs)
+      - ./data:/app/data     # persistence (cache + manifest references + saved configs)
       - ./config:/app/config
     restart: unless-stopped
 ```
@@ -326,7 +331,9 @@ pnpm --filter @nexotv/frontend build       # typecheck (vue-tsc) + build
   `catalogGroups`, `categoryTypes`, `sources`, `streamSelection`.
 - **Catalog/stream/meta resolution**: [`M3UEPGAddon.ts`](packages/backend/src/addon/M3UEPGAddon.ts)
   (`resolveCatalog`, `itemsForCatalog`, `parseId`, `buildSeriesMeta`).
-- **Compressed (gzip) + encrypted token**: [`cryptoConfig.ts`](packages/backend/src/utils/cryptoConfig.ts).
+- **Short manifest URL**: compressed/encrypted configuration in SQLite with a persistent opaque
+  reference via [`configTokenStore.ts`](packages/backend/src/utils/configTokenStore.ts). Legacy
+  self-contained tokens remain supported by [`cryptoConfig.ts`](packages/backend/src/utils/cryptoConfig.ts).
 - **Auth**: [`webauth.ts`](packages/backend/src/utils/webauth.ts) — **Config store**:
   [`configStore.ts`](packages/backend/src/utils/configStore.ts).
 - **Frontend** (Vue 3): [`CategorySelector.vue`](packages/frontend/src/components/CategorySelector.vue),

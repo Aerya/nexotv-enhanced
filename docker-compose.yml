@@ -11,6 +11,7 @@ services:
       # Refuse to start this Compose stack with unencrypted configuration URLs.
       CONFIG_SECRET: ${CONFIG_SECRET:?Set CONFIG_SECRET in the .env file}
     volumes:
+      # Persistent cache and encrypted configurations behind short manifest URLs.
       - ./data:/app/data
       - ./config:/app/config
     healthcheck:

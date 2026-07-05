@@ -191,7 +191,7 @@ describe('API routes (with CONFIG_SECRET)', () => {
   beforeAll(async () => {
     vi.resetModules();
     vi.doMock('../../src/config/env', () => ({
-      default: { ...baseEnv, CONFIG_SECRET: 'test-secret-32-chars-long!!' },
+      default: { ...baseEnv, CONFIG_SECRET: 'test-secret-32-chars-long!!', SQLITE_PATH: ':memory:' },
       repoRoot: '/tmp',
     }));
     const expressModule = await import('express');
@@ -207,12 +207,17 @@ describe('API routes (with CONFIG_SECRET)', () => {
   });
 
   it('POST /encrypt returns token when CONFIG_SECRET is set and body is valid JSON', async () => {
+    const config = { provider: 'm3u', m3uUrl: 'http://example.com/list.m3u' };
     const res = await request(app)
       .post('/encrypt')
-      .send({ provider: 'm3u', m3uUrl: 'http://example.com/list.m3u' });
+      .send(config);
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('token');
-    expect(res.body.token).toMatch(/^enc:/);
+    expect(res.body.token).toMatch(/^cfg_[A-Za-z0-9_-]{32}$/);
+    expect(res.body.token).toHaveLength(36);
+
+    const { resolveConfigToken } = await import('../../src/utils/configTokenStore');
+    expect(resolveConfigToken(res.body.token)).toEqual(config);
   });
 
   it('POST /encrypt returns 400 for malformed body', async () => {
@@ -282,7 +287,7 @@ describe('private API routes with WEBUI_PASSWORD', () => {
   it('round-trips an encrypted token only with a valid session', async () => {
     const config = { provider: 'stalker', stalkerUrl: 'http://portal', stalkerMac: '00:1A:79:00:00:01' };
     const enc = await request(app).post('/encrypt').set('Cookie', cookie).send(config);
-    expect(enc.body.token).toMatch(/^enc:/);
+    expect(enc.body.token).toMatch(/^cfg_[A-Za-z0-9_-]{32}$/);
 
     const res = await request(app)
       .post('/api/decode-token')

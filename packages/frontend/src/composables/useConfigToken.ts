@@ -27,7 +27,7 @@ export function useConfigToken(appendDetail: (line: string) => void) {
       if (res.ok) {
         const data = await res.json()
         token = data.token
-        appendDetail('✔ Config securely encrypted')
+        appendDetail('✔ Config securely encrypted and stored with a short URL')
       } else {
         appendDetail(`⚠ Encryption unavailable (HTTP ${res.status}). Falling back to Base64 (Not Secure).`)
         token = encodeConfigBase64Url(config)

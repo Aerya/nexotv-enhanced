@@ -69,12 +69,16 @@ NexoTV Enhanced propose deux usages volontairement distincts :
 
 | Mode | Fichier `.env` | Comportement |
 |---|---|---|
-| **Public / communautaire** | `CONFIG_SECRET` uniquement | Chacun crée sa propre URL chiffrée. Les configurations sauvegardées, statistiques et restaurations contenant des identifiants sont désactivées côté serveur. |
+| **Public / communautaire** | `CONFIG_SECRET` uniquement | Chacun crée sa propre URL courte et opaque. Les configurations sauvegardées, statistiques et restaurations contenant des identifiants sont désactivées côté serveur. |
 | **Privé / foyer** | `CONFIG_SECRET` + `WEBUI_PASSWORD` | La webui demande le mot de passe. Les personnes qui le connaissent partagent les configurations sauvegardées et les statistiques de l'instance. |
 
 `CONFIG_SECRET` ne crée pas de comptes : il chiffre les tokens personnels. `WEBUI_PASSWORD` ne crée
 pas non plus de comptes séparés : il ouvre un espace privé commun. Une URL personnelle d'addon doit
 toujours rester privée, car elle donne accès aux catalogues correspondants.
+
+La configuration chiffrée correspondant à l'URL courte est conservée dans `data/cache.sqlite`.
+Le volume `data/` doit donc rester monté et sauvegardé : supprimer cette base rend les URL courtes
+existantes inutilisables. Les anciennes URL contenant un token complet restent compatibles.
 
 ---
 
@@ -132,8 +136,9 @@ toujours rester privée, car elle donne accès aux catalogues correspondants.
 4. Section **Sur l'accueil** : cocher les catalogues à afficher sur l'**accueil** Stremio ; ceux
    décochés restent accessibles via **Découvrir** uniquement (techniquement : genre requis →
    hors board mais présent dans Discover).
-5. **Install Addon** : la sélection est encodée (et **compressée**) dans le token de configuration,
-   chiffré si `CONFIG_SECRET` est défini.
+5. **Install Addon** : la configuration est compressée, chiffrée puis stockée dans SQLite. Le
+   manifest utilise seulement une référence opaque de 36 caractères : ajouter beaucoup de providers
+   ou de catégories n'allonge plus l'URL.
 
 ### Films & Séries (Xtream)
 
@@ -287,7 +292,7 @@ services:
     environment:
       CONFIG_SECRET: ${CONFIG_SECRET:?Définir CONFIG_SECRET dans le fichier .env}
     volumes:
-      - ./data:/app/data     # persistance (cache + configs sauvegardées)
+      - ./data:/app/data     # persistance (cache + références manifest + configs sauvegardées)
       - ./config:/app/config
     restart: unless-stopped
 ```
@@ -336,7 +341,9 @@ pnpm --filter @nexotv/frontend build       # typecheck (vue-tsc) + build
   `catalogGroups`, `categoryTypes`.
 - **Résolution catalogue/flux/méta** : [`M3UEPGAddon.ts`](packages/backend/src/addon/M3UEPGAddon.ts)
   (`resolveCatalog`, `itemsForCatalog`, `parseId`, `buildSeriesMeta`).
-- **Token compressé (gzip) + chiffré** : [`cryptoConfig.ts`](packages/backend/src/utils/cryptoConfig.ts).
+- **URL manifest courte** : configuration compressée/chiffrée dans SQLite et référence opaque
+  persistante via [`configTokenStore.ts`](packages/backend/src/utils/configTokenStore.ts). Les anciens
+  tokens autonomes restent lus par [`cryptoConfig.ts`](packages/backend/src/utils/cryptoConfig.ts).
 - **Auth** : [`webauth.ts`](packages/backend/src/utils/webauth.ts) — **Stockage configs** :
   [`configStore.ts`](packages/backend/src/utils/configStore.ts).
 - **Frontend** (Vue 3) : [`CategorySelector.vue`](packages/frontend/src/components/CategorySelector.vue),

@@ -26,7 +26,7 @@ services:
     environment:
       CONFIG_SECRET: ${CONFIG_SECRET:?Définir CONFIG_SECRET dans le fichier .env}
     volumes:
-      - ./data:/app/data
+      - ./data:/app/data      # indispensable pour conserver les URL manifest
       - ./config:/app/config
     restart: unless-stopped
 ```
@@ -66,6 +66,9 @@ WEBUI_PASSWORD=CHOISIR_UN_VRAI_MOT_DE_PASSE
 ```
 
 Toutes les personnes connaissant ce mot de passe partageront alors les mêmes sauvegardes.
+
+Le dossier `data/` contient aussi les configurations chiffrées associées aux URL manifest courtes.
+Ne pas le supprimer et l'inclure dans les sauvegardes du serveur.
 
 ## 5. Démarrer
 
@@ -114,7 +117,9 @@ docker compose up -d
 ```
 
 Pour effacer définitivement les anciennes sauvegardes et l'historique de l'instance, arrêter le
-conteneur puis supprimer la base. **Cette commande efface aussi le cache et ne peut pas être annulée.**
+conteneur puis supprimer la base. **Cette commande efface aussi le cache et toutes les configurations
+associées aux URL manifest courtes. Les addons déjà installés devront être reconfigurés. Cette
+opération ne peut pas être annulée.**
 
 ```bash
 docker compose down
