@@ -127,6 +127,37 @@ describe('createManifest', () => {
     expect(single).toBeUndefined();
   });
 
+  it('keeps a large three-group manifest below the SDK 8 KiB limit without duplicating genres', () => {
+    const groupSizes = [56, 71, 81];
+    const catalogGroups = groupSizes.map((size, group) => ({
+      name: `Group ${group + 1}`,
+      categories: Array.from({ length: size }, (_, category) =>
+        `Provider ${group + 1} category ${String(category + 1).padStart(3, '0')}`),
+    }));
+    const selectedCategories = catalogGroups.flatMap(group => group.categories);
+    const manifest = createManifest('abc123', {
+      catalogMode: 'custom',
+      catalogGroups,
+      selectedCategories,
+    });
+
+    expect(manifest.catalogs).toHaveLength(3);
+    expect(manifest.catalogs.every((catalog: any) => !('genres' in catalog))).toBe(true);
+    expect((manifest.catalogs[0] as any).extra.find((extra: any) => extra.name === 'genre').options)
+      .toHaveLength(groupSizes[0] + 1);
+    expect(Buffer.byteLength(JSON.stringify(manifest), 'utf8')).toBeLessThanOrEqual(8192);
+  });
+
+  it('keeps extreme single-mode selections installable by compacting only genre options', () => {
+    const selectedCategories = Array.from({ length: 1000 }, (_, i) =>
+      `Long unique category ${i} ${String(i * 2654435761).padStart(16, '0')}`);
+    const manifest = createManifest('abc123', { catalogMode: 'single', selectedCategories });
+    const genre = (manifest.catalogs[0] as any).extra.find((extra: any) => extra.name === 'genre');
+
+    expect(genre.options).toEqual(['All Channels']);
+    expect(Buffer.byteLength(JSON.stringify(manifest), 'utf8')).toBeLessThanOrEqual(8192);
+  });
+
   it('custom mode ignores groups without a name or without categories', () => {
     const m = createManifest('abc123', {
       catalogMode: 'custom',

@@ -663,14 +663,13 @@ export class M3UEPGAddon {
                 )
             ].sort((a: any, b: any) => a.localeCompare(b));
             if (!groups.includes('All Channels')) groups.unshift('All Channels');
-            tvCatalog.genres = groups;
-
             const genreExtra = tvCatalog.extra.find((e: any) => e.name === 'genre');
             if (genreExtra) {
                 genreExtra.options = groups;
             }
         }
-        this.log.debug('Catalog genres built', { tvGenres: tvCatalog?.genres?.length || 0 });
+        const genreExtra = tvCatalog?.extra?.find((e: any) => e.name === 'genre');
+        this.log.debug('Catalog genres built', { tvGenres: genreExtra?.options?.length || 0 });
     }
 
     async updateData(force = false) {

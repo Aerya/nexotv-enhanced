@@ -24,6 +24,7 @@ export interface ManifestOptions {
 
 /** Catalog id used in "single" mode for live TV (kept stable for back-compat). */
 export const SINGLE_CATALOG_ID = 'iptv_channels';
+const MAX_MANIFEST_SIZE = 8192;
 
 /** Deterministic catalog id for the Nth selected category in "split" mode. */
 export function catalogIdForIndex(index: number) {
@@ -69,8 +70,7 @@ function catalogExtra(categories: string[], home: boolean) {
                 { name: 'genre', isRequired: true, options: genres },
                 { name: 'search', isRequired: false },
                 { name: 'skip' }
-            ],
-            genres
+            ]
         };
     }
     if (categories.length > 1) {
@@ -79,8 +79,7 @@ function catalogExtra(categories: string[], home: boolean) {
                 { name: 'genre', isRequired: false, options: genres },
                 { name: 'search', isRequired: false },
                 { name: 'skip' }
-            ],
-            genres
+            ]
         };
     }
     return { extra: [{ name: 'search', isRequired: false }, { name: 'skip' }] };
@@ -142,7 +141,6 @@ function buildCatalogs(opts: ManifestOptions) {
                 { name: 'search', isRequired: false },
                 { name: 'skip' }
             ],
-            genres,
         });
     };
 
@@ -156,12 +154,27 @@ function buildCatalogs(opts: ManifestOptions) {
     return catalogs;
 }
 
+/**
+ * The SDK rejects manifests above 8 KiB. Genre options are useful but optional:
+ * when an unusually large selection still exceeds the limit after removing the
+ * legacy duplicate `genres` field, keep an "All Channels" entry so the addon
+ * remains installable and every selected item stays reachable.
+ */
+function fitManifestToSdkLimit(manifest: any) {
+    if (Buffer.byteLength(JSON.stringify(manifest), 'utf8') <= MAX_MANIFEST_SIZE) return manifest;
+    for (const catalog of manifest.catalogs || []) {
+        const genre = (catalog.extra || []).find((extra: any) => extra.name === 'genre');
+        if (genre?.options?.length > 1) genre.options = ['All Channels'];
+    }
+    return manifest;
+}
+
 export function createManifest(idPrefix?: string, options?: ManifestOptions) {
     const opts = options || {};
     const catalogs = buildCatalogs(opts);
     // Declare every media type the catalogs expose (always include 'tv').
     const types = [...new Set<string>(['tv', ...catalogs.map((c: any) => c.type)])];
-    return {
+    return fitManifestToSdkLimit({
         id: 'community.nexotv.enhanced',
         version: '2.0.0',
         name: env.ADDON_NAME,
@@ -176,5 +189,5 @@ export function createManifest(idPrefix?: string, options?: ManifestOptions) {
         },
         ...(env.ADDON_LOGO_URL ? { logo: env.ADDON_LOGO_URL } : {}),
         ...(env.ADDON_BACKGROUND_URL ? { background: env.ADDON_BACKGROUND_URL } : {}),
-    };
+    });
 }
