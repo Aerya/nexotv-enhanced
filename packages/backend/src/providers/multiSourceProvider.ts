@@ -189,7 +189,11 @@ async function fetchM3uSource(src: any, idPrefix: string): Promise<any[]> {
     return out;
 }
 
-/** Fetch every configured source in parallel and merge into one tagged pool. */
+/**
+ * Fetch configured sources sequentially and merge them into one tagged pool.
+ * IPTV payloads can be very large; fetching every source in parallel keeps all
+ * raw provider responses alive at once and can exhaust the Node heap.
+ */
 export async function fetchData(addonInstance: any) {
     const sources: any[] = addonInstance.config.sources || [];
     if (!sources.length) throw new Error('No sources configured');
@@ -197,24 +201,31 @@ export async function fetchData(addonInstance: any) {
     addonInstance.channels = [];
     addonInstance.epgData = {};
 
-    const results = await Promise.all(sources.map(async (src) => {
+    const merged: any[] = [];
+    for (const src of sources) {
+        let channels: any[] = [];
         try {
-            if (src.provider === 'm3u') return await fetchM3uSource(src, addonInstance.idPrefix);
-            if (src.provider === 'stalker') {
+            if (src.provider === 'm3u') {
+                channels = await fetchM3uSource(src, addonInstance.idPrefix);
+            } else if (src.provider === 'stalker') {
                 const sel = selectionOf(src);
-                return await stalkerProvider.buildChannels(
+                channels = await stalkerProvider.buildChannels(
                     { url: src.stalkerUrl, mac: src.stalkerMac },
                     { idPrefix: addonInstance.idPrefix, selected: sel.selected, types: sel.types, source: srcTag(src) }
                 );
+            } else {
+                channels = await fetchXtreamSource(src, addonInstance.idPrefix, addonInstance.log);
             }
-            return await fetchXtreamSource(src, addonInstance.idPrefix, addonInstance.log);
         } catch (e: any) {
             addonInstance.log?.warn?.('[MULTI] Source failed', src?.name, e?.message);
-            return [];
         }
-    }));
+
+        // Append without Array#flat or a large spread, both of which create an
+        // avoidable memory spike for very large provider lists.
+        for (const channel of channels) merged.push(channel);
+    }
 
     // Preserve source order (priority) in the merged pool.
-    addonInstance.channels = results.flat();
+    addonInstance.channels = merged;
     addonInstance.log?.debug?.('Multi-source merged', { channels: addonInstance.channels.length });
 }
