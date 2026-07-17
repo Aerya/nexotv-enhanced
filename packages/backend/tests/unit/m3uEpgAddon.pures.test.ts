@@ -112,6 +112,52 @@ describe('createCacheKey', () => {
     });
     expect(key1).toBe(key2);
   });
+
+  it('includes hidden channels while normalizing order and duplicates', () => {
+    const base = { provider: 'xtream' as const, xtreamUrl: 'http://a.com', xtreamUsername: 'u' };
+    const key = createCacheKey({ ...base, hiddenChannels: ['xtream:2', 'xtream:1'] });
+    expect(key).toBe(createCacheKey({ ...base, hiddenChannels: ['xtream:1', 'xtream:2', 'xtream:1'] }));
+    expect(key).not.toBe(createCacheKey(base));
+  });
+
+  it('includes hidden channels in iptv-org cache keys', () => {
+    const base = { provider: 'iptv-org' as const, iptvOrgCountry: 'FR', iptvOrgCategory: null };
+    expect(createCacheKey({ ...base, hiddenChannels: ['iptv-org:TF1.fr'] }))
+      .not.toBe(createCacheKey(base));
+  });
+});
+
+// ─── Individual channel filtering ───────────────────────────────────────────
+
+describe('individual channel filtering', () => {
+  it('builds a provider-scoped key without the configuration hash prefix', () => {
+    const addon = new M3UEPGAddon({ provider: 'xtream' });
+    expect(addon.channelFilterKey({ id: `xc${addon.idPrefix}_1234` })).toBe('xtream:1234');
+  });
+
+  it('keeps the key stable when hidden channels change the cache prefix', () => {
+    const first = new M3UEPGAddon({ provider: 'm3u', m3uUrl: 'http://example/list.m3u' });
+    const second = new M3UEPGAddon({
+      provider: 'm3u',
+      m3uUrl: 'http://example/list.m3u',
+      hiddenChannels: ['m3u:aabbcc'],
+    });
+    expect(first.idPrefix).not.toBe(second.idPrefix);
+    expect(first.channelFilterKey({ id: `m3${first.idPrefix}_aabbcc` }))
+      .toBe(second.channelFilterKey({ id: `m3${second.idPrefix}_aabbcc` }));
+  });
+
+  it('removes only matching live channels and leaves movies untouched', () => {
+    const addon = new M3UEPGAddon({ provider: 'xtream', hiddenChannels: ['xtream:20'] });
+    addon.channels = [
+      { id: `xc${addon.idPrefix}_10`, mediaType: 'tv' },
+      { id: `xc${addon.idPrefix}_20`, mediaType: 'tv' },
+      { id: `xc${addon.idPrefix}_20`, mediaType: 'movie' },
+    ];
+    addon.applyHiddenChannelFilter();
+    expect(addon.channels.map(item => item.mediaType)).toEqual(['tv', 'movie']);
+    expect(addon.channels[0].id).toBe(`xc${addon.idPrefix}_10`);
+  });
 });
 
 // ─── generateMetaPreview ─────────────────────────────────────────────────────

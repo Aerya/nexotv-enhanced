@@ -76,6 +76,8 @@
       />
     </fieldset>
 
+    <ChannelSelector v-model="form.hiddenChannels" :config="buildConfig()" />
+
     <fieldset>
       <legend>{{ t('EPG Options', 'Options EPG') }}</legend>
 
@@ -186,6 +188,7 @@ import { usePublicPlaylists } from '../composables/usePublicPlaylists'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useI18n } from '../composables/useI18n'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
+import ChannelSelector from './ChannelSelector.vue'
 import TmdbKeyField from './TmdbKeyField.vue'
 import RefreshIntervalField from './RefreshIntervalField.vue'
 import { useAuth } from '../composables/useAuth'
@@ -222,6 +225,7 @@ const form = reactive({
   catalogMode: 'single' as CatalogMode,
   catalogGroups: [] as CatalogGroup[],
   discoverOnly: [] as string[],
+  hiddenChannels: [] as string[],
 })
 
 // Category loading state
@@ -368,6 +372,7 @@ onMounted(() => {
   form.refreshHours = (d as any).refreshHours ?? null
   form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
   form.discoverOnly = Array.isArray((d as any).discoverOnly) ? [...(d as any).discoverOnly] : []
+  form.hiddenChannels = Array.isArray(d.hiddenChannels) ? [...d.hiddenChannels] : []
   form.catalogMode = d.catalogMode === 'split' ? 'split'
     : d.catalogMode === 'custom' ? 'custom' : 'single'
   if (Array.isArray(d.catalogGroups) && d.catalogGroups.length) {
@@ -444,6 +449,7 @@ function buildConfig(): (M3uConfig & { catalogName?: string }) | null {
   if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
   if (form.refreshHours) config.refreshHours = form.refreshHours
   if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
+  if (form.hiddenChannels.length) config.hiddenChannels = [...form.hiddenChannels]
   return config
 }
 
@@ -517,6 +523,7 @@ async function handleInstall() {
   if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
   if (form.refreshHours) config.refreshHours = form.refreshHours
   if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
+  if (form.hiddenChannels.length) config.hiddenChannels = [...form.hiddenChannels]
 
   oc.showOverlay(false)
   oc.setProgress(5, 'Building M3U addon…')

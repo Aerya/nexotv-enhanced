@@ -41,6 +41,8 @@
       />
     </fieldset>
 
+    <ChannelSelector v-model="form.hiddenChannels" :config="buildConfig()" />
+
     <fieldset>
       <legend>{{ t('Metadata', 'Métadonnées') }}</legend>
       <TmdbKeyField v-model="form.tmdbApiKey" v-model:language="form.tmdbLanguage" />
@@ -66,6 +68,7 @@
 <script setup lang="ts">
 import { reactive, ref, inject, onMounted } from 'vue'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
+import ChannelSelector from './ChannelSelector.vue'
 import TmdbKeyField from './TmdbKeyField.vue'
 import RefreshIntervalField from './RefreshIntervalField.vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
@@ -86,6 +89,7 @@ const form = reactive({
   catalogMode: 'single' as CatalogMode,
   catalogGroups: [] as CatalogGroup[],
   discoverOnly: [] as string[],
+  hiddenChannels: [] as string[],
   tmdbApiKey: '',
   tmdbLanguage: 'fr-FR',
   refreshHours: null as number | null,
@@ -145,6 +149,7 @@ function buildConfig(): (StalkerConfig & { catalogName?: string }) | null {
   if (form.refreshHours) config.refreshHours = form.refreshHours
   if (form.catalogName.trim()) config.catalogName = form.catalogName.trim()
   if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
+  if (form.hiddenChannels.length) config.hiddenChannels = [...form.hiddenChannels]
   return config
 }
 
@@ -178,6 +183,7 @@ onMounted(() => {
   if (Array.isArray(d.catalogGroups)) form.catalogGroups = d.catalogGroups.map(g => ({ name: g.name, categories: [...g.categories] }))
   if (Array.isArray(d.selectedCategories)) form.selectedCategories = [...d.selectedCategories]
   if (Array.isArray((d as any).discoverOnly)) form.discoverOnly = [...(d as any).discoverOnly]
+  if (Array.isArray(d.hiddenChannels)) form.hiddenChannels = [...d.hiddenChannels]
   form.tmdbApiKey = (d as any).tmdbApiKey || ''
   form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
   form.refreshHours = (d as any).refreshHours ?? null

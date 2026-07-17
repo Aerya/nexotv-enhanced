@@ -181,6 +181,22 @@ describe('API routes (without CONFIG_SECRET)', () => {
       expect(res.body.error).toMatch(/Blocked host/i);
     });
   });
+
+  describe('POST /api/channels/preview', () => {
+    it('rejects a missing configuration', async () => {
+      const res = await request(app).post('/api/channels/preview').send({});
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Configuration required/i);
+    });
+
+    it('rejects an unsupported provider', async () => {
+      const res = await request(app)
+        .post('/api/channels/preview')
+        .send({ config: { provider: 'unknown' } });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Unsupported provider/i);
+    });
+  });
 });
 
 // ─── With CONFIG_SECRET ───────────────────────────────────────────────────────

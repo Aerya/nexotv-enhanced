@@ -53,6 +53,8 @@
       />
     </fieldset>
 
+    <ChannelSelector v-model="form.hiddenChannels" :config="buildConfig()" />
+
     <fieldset>
       <legend>{{ t('EPG Options', 'Options EPG') }}</legend>
       <div class="form-group checkbox-line">
@@ -126,6 +128,7 @@ import { reactive, ref, inject, onMounted } from 'vue'
 import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAddonInfo } from '../composables/useAddonInfo'
 import CategorySelector, { type CategoryEntry } from './CategorySelector.vue'
+import ChannelSelector from './ChannelSelector.vue'
 import TmdbKeyField from './TmdbKeyField.vue'
 import RefreshIntervalField from './RefreshIntervalField.vue'
 import { useAuth } from '../composables/useAuth'
@@ -157,6 +160,7 @@ const form = reactive({
   catalogMode: 'single' as CatalogMode,
   catalogGroups: [] as CatalogGroup[],
   discoverOnly: [] as string[],
+  hiddenChannels: [] as string[],
   tmdbApiKey: '',
   tmdbLanguage: 'fr-FR',
   refreshHours: null as number | null,
@@ -194,6 +198,7 @@ onMounted(() => {
   form.tmdbLanguage = (d as any).tmdbLanguage || 'fr-FR'
   form.refreshHours = (d as any).refreshHours ?? null
   form.discoverOnly = Array.isArray((d as any).discoverOnly) ? [...(d as any).discoverOnly] : []
+  form.hiddenChannels = Array.isArray(d.hiddenChannels) ? [...d.hiddenChannels] : []
   form.catalogMode = d.catalogMode === 'split' ? 'split'
     : d.catalogMode === 'custom' ? 'custom' : 'single'
   if (Array.isArray(d.catalogGroups) && d.catalogGroups.length) {
@@ -482,6 +487,7 @@ function buildConfig(): XtreamConfig | null {
   if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
   if (form.refreshHours) config.refreshHours = form.refreshHours
   if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
+  if (form.hiddenChannels.length) config.hiddenChannels = [...form.hiddenChannels]
   return config
 }
 
@@ -626,6 +632,7 @@ async function handleSubmit() {
     if (form.tmdbApiKey.trim()) { config.tmdbApiKey = form.tmdbApiKey.trim(); config.tmdbLanguage = form.tmdbLanguage }
   if (form.refreshHours) config.refreshHours = form.refreshHours
     if (form.discoverOnly.length) config.discoverOnly = [...form.discoverOnly]
+    if (form.hiddenChannels.length) config.hiddenChannels = [...form.hiddenChannels]
 
     const passHash = await sha256Fragment(password)
     oc.appendDetail(`Password hash fragment: ${passHash}`)

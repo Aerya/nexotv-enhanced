@@ -66,6 +66,8 @@
       </div>
     </fieldset>
 
+    <ChannelSelector v-model="hiddenChannels" :config="buildConfig()" />
+
     <fieldset>
       <legend>{{ t('Display', 'Affichage') }}</legend>
       <div class="form-group">
@@ -96,11 +98,13 @@ import { useSavedConfigs } from '../composables/useSavedConfigs'
 import { useAuth } from '../composables/useAuth'
 import { useI18n } from '../composables/useI18n'
 import type { IptvOrgConfig } from '../types/config'
+import ChannelSelector from './ChannelSelector.vue'
 
 const oc = inject<any>('overlayControl')!
 const { t } = useI18n()
 const auth = useAuth()
 const catalogName = ref('')
+const hiddenChannels = ref<string[]>([])
 
 const IPTV_ORG_BASE = 'https://iptv-org.github.io/api'
 
@@ -236,6 +240,7 @@ onMounted(async () => {
           .filter(Boolean) as SelectItem[]
       }
       catalogName.value = (decodedConfig as any).catalogName || ''
+      if (Array.isArray(d.hiddenChannels)) hiddenChannels.value = [...d.hiddenChannels]
     }
   } catch (err) {
     console.error('[IPTV-ORG] Failed to load countries/categories', err)
@@ -247,6 +252,7 @@ function buildConfig(): IptvOrgConfig & { catalogName?: string } {
     provider: 'iptv-org',
     iptvOrgCountry: selectedCountries.value.map(c => c.value).join(',') || null,
     iptvOrgCategory: selectedCategories.value.map(c => c.value).join(',') || null,
+    ...(hiddenChannels.value.length ? { hiddenChannels: [...hiddenChannels.value] } : {}),
     ...(catalogName.value.trim() ? { catalogName: catalogName.value.trim() } : {}),
   }
 }
@@ -278,6 +284,7 @@ async function handleSubmit() {
       provider: 'iptv-org',
       iptvOrgCountry: country,
       iptvOrgCategory: category,
+      ...(hiddenChannels.value.length ? { hiddenChannels: [...hiddenChannels.value] } : {}),
       ...(catalogName.value.trim() ? { catalogName: catalogName.value.trim() } : {}),
     }
 

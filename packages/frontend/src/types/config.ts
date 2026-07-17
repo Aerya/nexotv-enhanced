@@ -36,6 +36,7 @@ export interface StalkerConfig {
   tmdbApiKey?: string;
   tmdbLanguage?: string;
   refreshHours?: number;
+  hiddenChannels?: string[];
 }
 
 export interface MultiConfig {
@@ -51,6 +52,7 @@ export interface MultiConfig {
   tmdbApiKey?: string;
   tmdbLanguage?: string;
   refreshHours?: number;
+  hiddenChannels?: string[];
 }
 
 export interface XtreamConfig {
@@ -70,6 +72,7 @@ export interface XtreamConfig {
   tmdbApiKey?: string;
   tmdbLanguage?: string;
   refreshHours?: number;
+  hiddenChannels?: string[];
   prescan?: {
     liveCount: number;
     categoryCount: number;
@@ -85,6 +88,7 @@ export interface IptvOrgConfig {
   provider: 'iptv-org';
   iptvOrgCountry: string | null;
   iptvOrgCategory: string | null;
+  hiddenChannels?: string[];
 }
 
 export interface M3uConfig {
@@ -103,6 +107,7 @@ export interface M3uConfig {
   tmdbApiKey?: string;
   tmdbLanguage?: string;
   refreshHours?: number;
+  hiddenChannels?: string[];
 }
 
 export type AddonConfig = (XtreamConfig | IptvOrgConfig | M3uConfig | StalkerConfig | MultiConfig) & { catalogName?: string };

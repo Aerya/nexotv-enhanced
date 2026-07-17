@@ -84,6 +84,8 @@
       />
     </fieldset>
 
+    <ChannelSelector v-model="hiddenChannels" :config="buildConfig()" />
+
     <fieldset>
       <legend>{{ t('Playback', 'Lecture') }}</legend>
       <div class="form-group">
@@ -122,6 +124,7 @@ import { useDecodedToken } from '../composables/useDecodedToken'
 import { useAuth } from '../composables/useAuth'
 import { useSavedConfigs } from '../composables/useSavedConfigs'
 import CategorySelector from './CategorySelector.vue'
+import ChannelSelector from './ChannelSelector.vue'
 import TmdbKeyField from './TmdbKeyField.vue'
 import RefreshIntervalField from './RefreshIntervalField.vue'
 import { useI18n } from '../composables/useI18n'
@@ -161,6 +164,7 @@ const refreshHours = ref<number | null>(null)
 const globalSelected = ref<string[]>([])
 const catalogGroups = ref<CatalogGroup[]>([])
 const discoverOnly = ref<string[]>([])
+const hiddenChannels = ref<string[]>([])
 
 // Merged category pool = union of every source's selected categories.
 // Type priority on conflicts: movie/series win over tv.
@@ -346,6 +350,7 @@ function buildConfig(): (MultiConfig & { catalogName?: string }) | null {
     ...(tmdbApiKey.value.trim() ? { tmdbApiKey: tmdbApiKey.value.trim(), tmdbLanguage: tmdbLanguage.value } : {}),
     ...(refreshHours.value ? { refreshHours: refreshHours.value } : {}),
     ...(discoverOnly.value.length ? { discoverOnly: [...discoverOnly.value] } : {}),
+    ...(hiddenChannels.value.length ? { hiddenChannels: [...hiddenChannels.value] } : {}),
   }
 
   if (catalogMode.value === 'custom') {
@@ -415,6 +420,7 @@ onMounted(() => {
   tmdbLanguage.value = d.tmdbLanguage || 'fr-FR'
   refreshHours.value = d.refreshHours ?? null
   if (Array.isArray(d.discoverOnly)) discoverOnly.value = [...d.discoverOnly]
+  if (Array.isArray(d.hiddenChannels)) hiddenChannels.value = [...d.hiddenChannels]
 })
 </script>
 

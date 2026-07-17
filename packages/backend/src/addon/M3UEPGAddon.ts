@@ -58,6 +58,8 @@ export interface AddonConfig {
     catalogGroups?: Array<{ name: string; categories: string[] }>;
     /** Catalogs kept off the home board (Discover only). See manifest ManifestOptions. */
     discoverOnly?: string[];
+    /** Stable provider-scoped keys of live TV channels hidden by the user. */
+    hiddenChannels?: string[];
     /** Category name → media type ('tv' | 'movie' | 'series'). Drives VOD/series. */
     categoryTypes?: Record<string, 'tv' | 'movie' | 'series'>;
     /** TMDB API key (entered in the webui) to enrich movie/series metadata. */
@@ -134,12 +136,16 @@ function normalizeSelection(config: AddonConfig) {
         if (srcTypes[name]) types[name] = srcTypes[name];
     }
     const discoverOnly = [...new Set((config.discoverOnly || []).filter(Boolean))].sort();
+    const hiddenChannels = [...new Set((config.hiddenChannels || [])
+        .map(key => (typeof key === 'string' ? key.trim() : ''))
+        .filter(Boolean))].sort();
     return {
         catalogMode: mode,
         selectedCategories: [...new Set(cats)].sort(),
         catalogGroups: groups,
         categoryTypes: types,
         discoverOnly,
+        hiddenChannels,
     };
 }
 
@@ -178,10 +184,12 @@ export function createCacheKey(config: AddonConfig) {
             ...normalizeSelection(config),
         };
     } else if (provider === 'iptv-org') {
+        const hiddenChannels = normalizeSelection(config).hiddenChannels;
         minimal = {
             provider,
             iptvOrgCountry: config.iptvOrgCountry || null,
             iptvOrgCategory: config.iptvOrgCategory || null,
+            ...(hiddenChannels.length ? { hiddenChannels } : {}),
         };
     } else if (provider === 'm3u') {
         minimal = {
@@ -431,6 +439,32 @@ export class M3UEPGAddon {
             out.push(c);
         }
         return out;
+    }
+
+    /**
+     * Provider-scoped key that stays stable when the configuration hash changes.
+     * Runtime ids embed idPrefix, so storing them directly would make exclusions
+     * invalidate themselves as soon as the cache key changes.
+     */
+    channelFilterKey(item: any): string {
+        const id = typeof item?.id === 'string' ? item.id : '';
+        const prefixes = [`xc${this.idPrefix}_`, `m3${this.idPrefix}_`, `io${this.idPrefix}_`];
+        const prefix = prefixes.find(candidate => id.startsWith(candidate));
+        const stableId = prefix ? id.slice(prefix.length) : id;
+        return `${this.providerName}:${stableId}`;
+    }
+
+    /** Remove hidden live channels before they enter channelMap or the cache. */
+    applyHiddenChannelFilter() {
+        const hidden = new Set(
+            (this.config.hiddenChannels || [])
+                .map(key => (typeof key === 'string' ? key.trim() : ''))
+                .filter(Boolean)
+        );
+        if (!hidden.size) return;
+        this.channels = this.channels.filter(item =>
+            mediaTypeOf(item) !== 'tv' || !hidden.has(this.channelFilterKey(item))
+        );
     }
 
     /** True when this addon aggregates multiple IPTV sources. */
@@ -690,6 +724,7 @@ export class M3UEPGAddon {
             if (!providerModule) throw new Error(`Unknown provider: ${this.providerName}`);
             const epgUpdateTimeBefore = this.lastEpgUpdate;
             await providerModule.fetchData(this);
+            this.applyHiddenChannelFilter();
             this.channelMap = new Map(this.channels.map(c => [c.id, c]));
             this.lastUpdate = Date.now();
             if (CACHE_ENABLED && this.channels.length > 0) {

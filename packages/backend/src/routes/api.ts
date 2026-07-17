@@ -13,6 +13,7 @@ import { getCategories as stalkerCategories } from '../providers/stalkerProvider
 import { validatePublicUrl } from '../utils/validateUrl';
 import * as viewLog from '../utils/viewLog';
 import createAddon from '../addon/builder';
+import { M3UEPGAddon } from '../addon/M3UEPGAddon';
 
 const router = Router();
 
@@ -77,6 +78,38 @@ router.post('/api/stalker/categories', requireAuth, async (req, res) => {
         res.json({ categories });
     } catch {
         res.status(502).json({ error: 'Stalker portal unreachable' });
+    }
+});
+
+// Live-channel preview for the config UI. Only display metadata and stable
+// filter keys are returned; stream URLs and provider credentials never leave
+// the server response.
+router.post('/api/channels/preview', requireAuth, async (req, res) => {
+    const rawConfig = req.body?.config;
+    if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
+        return res.status(400).json({ error: 'Configuration required' });
+    }
+    const provider = rawConfig.sources?.length ? 'multi' : (rawConfig.provider || 'xtream');
+    if (!['xtream', 'm3u', 'stalker', 'iptv-org', 'multi'].includes(provider)) {
+        return res.status(400).json({ error: 'Unsupported provider' });
+    }
+
+    const addon = new M3UEPGAddon({ ...rawConfig, hiddenChannels: [] });
+    try {
+        await addon.updateData(true);
+        const channels = addon.channels
+            .filter((item: any) => (item.mediaType || 'tv') === 'tv')
+            .map((item: any) => ({
+                key: addon.channelFilterKey(item),
+                name: String(item.name || 'Unnamed channel'),
+                category: String(item.category || item.attributes?.['group-title'] || 'Uncategorized'),
+                ...(item.source?.name ? { source: String(item.source.name) } : {}),
+            }));
+        res.json({ channels });
+    } catch {
+        res.status(502).json({ error: 'Unable to load channels' });
+    } finally {
+        addon._evictFromMemory();
     }
 });
 
