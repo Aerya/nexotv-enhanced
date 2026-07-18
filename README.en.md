@@ -45,6 +45,7 @@ features on top of the upstream code.
 | **Live TV channels** | The core: streams your **live TV channels** (Xtream, M3U/M3U+, IPTV-org, Stalker) in Stremio, with EPG, logos and search. *(upstream foundation, preserved.)* |
 | **Multi-source** | Add **several** Xtream/M3U/Stalker sources mixed into the same catalogs, with **Movies/Series de-duplication** and per-source stream choice. |
 | **Categories** | The webui loads the feed's categories, **labels them by type** (TV / Movies / Series) and lets you **pick** which ones to keep (filter, all / none / invert). |
+| **Hidden channels** | Hide individual live TV channels, with search, category filtering and bulk actions. They are removed from catalogs and playback routes. |
 | **Catalogs** | 3 layouts: a single catalog, one per category, or **custom catalogs** (named groups of categories). |
 | **Home / Discover** | Choose, per catalog, which ones show on the **home** board; the others stay accessible via **Discover**. |
 | **Movies & Series (Xtream)** | Movies/Series categories become **real playable Stremio catalogs** (`movie` / `series`, series with **seasons + episodes**). |
@@ -136,6 +137,20 @@ full self-contained token remain compatible.
 5. **Install Addon**: the configuration is compressed, encrypted, then stored in SQLite. The manifest
    URL contains only a 36-character opaque reference, so adding many providers or categories no
    longer makes the URL grow.
+
+### Hide individual channels
+
+In every provider (Xtream, M3U, IPTV-org, Stalker and multi-source), the **Channels** section lets
+you exclude individual live TV channels without removing their whole category:
+
+1. Click **Load channels** after entering the provider settings.
+2. Search for a channel or filter the list by category, then **untick** the channels to hide.
+   **Hide filtered** and **Show filtered** apply the choice to every filtered result.
+3. Install or reconfigure the addon to store the selection in its configuration.
+
+Hidden channels no longer appear in Stremio catalogs, and their playback routes are unavailable as
+well. The selection is specific to each configuration and is retained when it is saved or
+reconfigured.
 
 ### Movies & Series (Xtream)
 

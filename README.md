@@ -46,6 +46,7 @@ fonctionnalités au-dessus du code amont.
 | **Chaînes TV (live)** | Le cœur : diffuse vos **chaînes TV en direct** (Xtream, M3U/M3U+, IPTV-org, Stalker) dans Stremio, avec EPG, logos et recherche. *(socle hérité de l'amont, conservé.)* |
 | **Multi-source** | Ajouter **plusieurs sources** Xtream/M3U/Stalker mixées dans les mêmes catalogues, avec **déduplication Films/Séries** et choix du flux à la lecture. |
 | **Catégories** | La webui charge les catégories du flux, les **étiquette par type** (TV / Films / Séries) et permet de **cocher** celles à garder (filtre, tout / aucun / inverser). |
+| **Chaînes masquées** | Masquer individuellement des chaînes TV, avec recherche, filtre par catégorie et actions groupées. Elles sont retirées des catalogues et des routes de lecture. |
 | **Catalogues** | 3 mises en page : un seul catalogue, un par catégorie, ou des **catalogues personnalisés** (groupes nommés de catégories). |
 | **Accueil / Découvrir** | Choisir, par catalogue, lesquels s'affichent sur l'**accueil** ; les autres restent accessibles via **Découvrir**. |
 | **Films & Séries (Xtream)** | Les catégories Films/Séries deviennent de **vrais catalogues Stremio** `movie` / `series` jouables (séries avec **saisons + épisodes**). |
@@ -139,6 +140,21 @@ existantes inutilisables. Les anciennes URL contenant un token complet restent c
 5. **Install Addon** : la configuration est compressée, chiffrée puis stockée dans SQLite. Le
    manifest utilise seulement une référence opaque de 36 caractères : ajouter beaucoup de providers
    ou de catégories n'allonge plus l'URL.
+
+### Masquer des chaînes individuellement
+
+Dans chacun des providers (Xtream, M3U, IPTV-org, Stalker et multi-source), la section **Chaînes**
+permet d'exclure des chaînes TV sans devoir retirer toute leur catégorie :
+
+1. Clique **Charger les chaînes** après avoir renseigné le provider.
+2. Recherche une chaîne ou filtre la liste par catégorie, puis **décoche** les chaînes à masquer.
+   Les actions **Masquer le filtre** et **Afficher le filtre** appliquent le choix à tous les
+   résultats filtrés.
+3. Installe ou reconfigure l'addon pour enregistrer la sélection dans sa configuration.
+
+Les chaînes masquées ne figurent plus dans les catalogues Stremio et leurs routes de lecture sont
+également indisponibles. La sélection est spécifique à la configuration et reste conservée lors de
+sa sauvegarde ou de sa reconfiguration.
 
 ### Films & Séries (Xtream)
 
