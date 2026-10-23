@@ -19,18 +19,24 @@ export function init(dbPath: string | null) {
         fs.mkdirSync(dir, { recursive: true });
     }
 
+    const existed = fs.existsSync(resolvedPath);
     try {
         db = new Database(resolvedPath);
         db.pragma('journal_mode = WAL');
         db.pragma('synchronous = NORMAL');
-    } catch {
-        // SQLite fails on Windows bind mounts in Docker (SQLITE_IOERR_SHMOPEN).
-        // Fall back to in-memory cache — safe since this is pure cache (no primary data).
-        log.warn('SQLite persistent cache unavailable (filesystem limitation), using in-memory cache — data will not survive restarts');
+    } catch (error) {
         try { db?.close(); } catch {}
-        for (const ext of ['', '-shm', '-wal']) {
-            try { fs.unlinkSync(resolvedPath + ext); } catch {}
+        db = null;
+        // Never delete persistent configurations or silently replace an existing
+        // database with an empty in-memory store after a permissions error.
+        const code = (error as { code?: string }).code || '';
+        if (existed || !code.startsWith('SQLITE_IOERR')) {
+            log.error('Cannot open persistent SQLite storage; check volume permissions and the Compose user');
+            throw error;
         }
+        // Preserve the Windows filesystem workaround only for a new database.
+        // Leave all files intact, including WAL/SHM files.
+        log.warn('SQLite filesystem does not support a new database; using volatile memory storage');
         db = new Database(':memory:');
     }
 

@@ -18,7 +18,7 @@
     "compression": "^1.8.2",
     "dotenv": "^17.4.2",
     "express": "^4.22.3",
-    "express-rate-limit": "^8.7.0",
+    "express-rate-limit": "^8.7.1",
     "stremio-addon-sdk": "^1.6.10",
     "xml2js": "^0.6.2"
   },
@@ -29,8 +29,8 @@
     "@types/node": "^20.19.43",
     "@types/supertest": "^7.2.1",
     "@types/xml2js": "^0.4.14",
-    "@vitest/coverage-v8": "^2.1.0",
-    "supertest": "^7.3.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "^5.4.0",
     "vitest": "^4.1.11"
