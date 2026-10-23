@@ -24,6 +24,12 @@
 
 ---
 
+### Sécurité TLS — octobre 2026
+
+Mise à jour des certificats et des composants TLS des images après l’incident eMudhra. Les contrôles couvrent les chaînes compromises, dont les deux cas « No CT », et une connexion HTTPS valide. Une image déjà en cours d’exécution reste inchangée : son remplacement doit être planifié après validation.
+
+[Détails de l’incident](https://emudhra.we-have-a-problem.com/) · [TLS checks](security/emudhra/README.md)
+
 ## Origine du projet (attribution)
 
 Ce dépôt est un **fork amélioré** de **[joaosavi/nexotv](https://github.com/joaosavi/nexotv)**,
