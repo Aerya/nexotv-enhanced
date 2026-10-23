@@ -1,4 +1,8 @@
-FROM node:22-alpine
+FROM node:22.23.4-alpine
+
+# eMudhra: refresh both the CA sources and the generated bundle.
+RUN apk add --no-cache --upgrade ca-certificates ca-certificates-bundle \
+    && update-ca-certificates
 
 WORKDIR /app
 
@@ -27,7 +31,10 @@ RUN pnpm --filter @nexotv/backend build
 
 # Copy runtime config and create data dir
 COPY config/ ./config/
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chown node:node /app/data
+
+# Only the image directory is prepared; mounted volumes are never chmod/chown-ed.
+USER node:node
 
 EXPOSE 7000
 
