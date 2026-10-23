@@ -1,5 +1,13 @@
 <h1 align="center">NexoTV-Enhanced</h1>
 
+
+### Utilisateur Docker et volumes existants
+
+L’image s’exécute désormais avec `node` (UID/GID `1000:1000`). **Avant de mettre à jour une installation dont les données appartiennent à root**, ajouter `user: "0:0"` au service `nexotv` dans son Compose actuel. Avec le Compose fourni ici, définir plutôt `CONTAINER_USER=0:0` dans `.env`. Conserver les chemins des volumes, les variables et les secrets existants. Ce mode de compatibilité conserve l’exécution en root ; le correctif TLS reste appliqué.
+
+Pour une nouvelle installation, utiliser un volume nommé vide monté sur `/app/data` (Docker reprend les permissions de l’image), ou préparer un répertoire bind accessible en écriture à `1000:1000`. Les utilisateurs personnalisés restent possibles avec `user: "UID:GID"`. Les montages de configuration NexoTV doivent également être lisibles par cet utilisateur. Aucun script de démarrage ne change les propriétaires ou permissions. Ne pas appliquer de changement récursif de propriétaire aux volumes existants. Le remplacement de l’image reste à planifier séparément ; modifier ces fichiers ne migre pas les conteneurs en cours.
+
+
 <p align="center"><strong><a href="README.en.md">🇬🇧 English version</a></strong></p>
 
 <p align="center">
@@ -306,6 +314,7 @@ la génération du secret et les deux vérifications de sécurité à effectuer.
 services:
   nexotv:
     image: ghcr.io/aerya/nexotv-enhanced:latest
+    user: "${CONTAINER_USER:-1000:1000}"
     container_name: nexotv-enhanced
     ports:
       - "7000:7000"

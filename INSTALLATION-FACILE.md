@@ -1,5 +1,7 @@
 # Installation facile de NexoTV Enhanced
 
+> **Mise à jour d’une installation existante :** avant de remplacer l’image, ajouter `user: "0:0"` au service `nexotv` si les données appartiennent à root. Conserver les volumes et secrets. Voir [utilisateur Docker et volumes](README.md#utilisateur-docker-et-volumes-existants). Les nouvelles installations utilisent UID/GID `1000:1000` et un répertoire accessible en écriture à cet utilisateur.
+
 Ce guide est fait pour une instance publique où chacun configure sa propre liste sans voir celles
 des autres. Il suffit de copier-coller les blocs dans l'ordre.
 
@@ -18,6 +20,7 @@ Créer un fichier nommé `docker-compose.yml` avec exactement ceci :
 services:
   nexotv:
     image: ghcr.io/aerya/nexotv-enhanced:latest
+    user: "${CONTAINER_USER:-1000:1000}"
     container_name: nexotv-enhanced
     ports:
       - "7000:7000"

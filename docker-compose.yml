@@ -2,6 +2,9 @@ version: '3.8'
 services:
   nexotv:
     image: ghcr.io/aerya/nexotv-enhanced:latest
+    # Existing root-owned volumes: set CONTAINER_USER=0:0 before updating.
+    # New bind mounts must be writable by UID/GID 1000:1000.
+    user: "${CONTAINER_USER:-1000:1000}"
     container_name: nexotv-enhanced
     ports:
       - "7000:7000"
