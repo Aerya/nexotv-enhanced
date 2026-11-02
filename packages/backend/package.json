@@ -18,7 +18,7 @@
     "compression": "^1.8.2",
     "dotenv": "^17.4.2",
     "express": "^4.22.3",
-    "express-rate-limit": "^8.7.1",
+    "express-rate-limit": "^8.7.2",
     "stremio-addon-sdk": "^1.6.10",
     "xml2js": "^0.6.2"
   },
